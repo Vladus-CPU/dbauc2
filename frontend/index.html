@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="uk">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Auction House</title>
+        <link rel="stylesheet" href="backgroundstyle.css">
+    </head>
+    <body>
+        <header>
+            <h1>Welcome to the Auction House</h1>
+            </header>
+            <main>
+                <div class="orderslist">
+                    <div class="orderbids"></div>
+                    <h2>Buy Orders</h2>
+                    <table id="orderstable">
+                        <thead>
+                            <tr>
+                                <!--- пропадає при перемиканні, перемикаєця на sell orders-->
+                                <th>Cost</th>
+                                <th>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Buy orders -->
+                        </tbody>
+                </div>
+                <div class="orderbids"> 
+                    <h2>Sell Orders</h2>
+                    <table id="orderstable">
+                        <thead>
+                            <tr>
+                                <!--- пропадає при перемиканні, перемикаєця на buy orders-->
+                                <th>Cost</th>
+                                <th>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Sell orders -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="orderformcontainer">
+                    <h2>Place Order</h2>
+                    <form id="orderform">
+                        <label for="ordertype">Order Type:</label>
+                        <select id="ordertype" name="ordertype" required>
+                            <option value="" disabled selected>Select order type</option>
+                            <option value="buy">Buy</option>
+                            <option value="sell">Sell</option>
+                        </select>
+                        <div class="orderinputs">
+                            <label for="price">Cost:</label>
+                            <input type="number" id="price" name="price"  step="0.1" min="0" required>
+                        </div>
+                        <div class="orderinputs">
+                            <label for="amount">Amount:</label>
+                            <input type="number" id="amount" name="amount" step="0.1" min="0" required>
+                        </div>
+                        <button type="submit">Place Order</button>
+                    </form>
+                </div>
+            </main>
+            <script src="script.js"></script>
+    </body>
+</html>
