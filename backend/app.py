@@ -3,8 +3,10 @@ from flask_cors import CORS
 import MYSQL.connector
 from MYSQL.connector import Error, pooling, connect
 from config import DB_CONFIG
+from errors import AppError, OrderDataError, DBError, ErrorRoutes
 
 app = Flask(__name__)
+ErrorRoutes(app)
 CORS(app)
 def db_connection():
     try:
