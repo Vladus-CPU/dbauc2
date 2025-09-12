@@ -3,66 +3,142 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Auction House</title>
-        <link rel="stylesheet" href="backgroundstyle.css">
-        <link rel="stylesheet" href="css/base.css">
-        <link rel="stylesheet" href="styles.css">
+        <title>Auction House - Main Page</title>
+        <link rel="stylesheet" href="css/backgroundstyle.css">
+        <link rel="stylesheet" href="css/style.css">
+        <style>
+            body { 
+                background-color: #f6f7f9; 
+                font-family: Inter, sans-serif;
+                margin: 0;
+                color : #333;
+                .container {
+                    max-width: 1100px;
+                    margin : 20px auto;
+                    padding: 15px;
+                }
+                header.site-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    background-color: #f6f7f9;
+                    padding: 14px 20px;
+                    border-bottom: 1px solid #eee;
+                }
+                header nav a {
+                    margin-left:12px;
+                    text-decoration:none;
+                    color:#333
+                }
+                .search-row {
+                    display:flex;
+                    gap:12px;
+                    margin:18px 0
+                }
+                .search-row input, .search-row select {
+                    padding:10px;
+                    border-radius:8px;
+                    border:1px solid #ddd
+                }
+                .listings-grid {
+                    display:grid;
+                    grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+                    gap:16px
+                }
+                .card {
+                    background:#fff;
+                    padding:12px;
+                    border-radius:8px;
+                    box-shadow:0 1px 3px rgba(0,0,0,0.04)
+                }
+                .card h3 {
+                    margin:0 0 8px 0;
+                    font-size:16px
+                }
+                .meta {
+                    font-size:13px;
+                    color:#666;
+                    margin-bottom:8px
+                }
+                .card .price {
+                    font-weight:600;
+                    margin-right:8px
+                }
+                .btn {
+                    display:inline-block;
+                    padding:8px 10px;
+                    border-radius:6px;
+                    background:#2b7;
+                    color:#fff;
+                    text-decoration:none
+                }
+                .empty {
+                    padding:24px;
+                    text-align:center;
+                    color:#666
+                }
+                .pagination {
+                    display:flex;
+                    gap:8px;
+                    justify-content:center;
+                    margin-top:18px
+                }
+                .page-btn {
+                    padding:8px 10px;
+                    border-radius:6px;
+                    border:1px solid #ddd;
+                    background:#fff;
+                    cursor:pointer;
+                }
+            }
+        </style>
     </head>
     <body>
-        <header>
-            <h1>Welcome to the Auction House</h1>
-            </header>
-            <main>
-                <div class="orderslist">
-                    <h2>Buy Orders</h2>
-                    <table id="bidstable">
-                        <thead>
-                            <tr>
-                                <!--- пропадає при перемиканні, перемикаєця на sell orders-->
-                                <th>Price</th>
-                                <th>Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Buy orders -->
-                        </tbody>
-                </div>
-                <div class="orderbids"> 
-                    <h2>Sell Orders</h2>
-                    <table id="askstable">
-                        <thead>
-                            <tr>
-                                <!--- пропадає при перемиканні, перемикаєця на buy orders-->
-                                <th>Price</th>
-                                <th>Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <!-- Sell orders -->
-                        </tbody>
-                    </table>
-                </div>
-                <div class="orderformcontainer">
-                    <h2>Place Order</h2>
-                    <form id="orderform">
-                        <label for="ordertype">Order Type:</label>
-                        <select id="ordertype" name="ordertype" required>
-                            <option value="" disabled selected>Select order type</option>
-                            <option value="buy">Buy</option>
-                            <option value="sell">Sell</option>
-                        </select>
-                        <div class="orderinputs">
-                            <label for="price">Price:</label>
-                            <input type="number" id="price" name="price"  step="0.1" min="0" required>
+        <header class ="site-header">
+            <div style="display: flow-root;gap: 12px; align-items: center;">
+                <h1 style="margin: 0; font-size: 28px; font-weight: 880; letter-spacing: 1px; color: #2b7;">Auction House</h1>
+                <span style="display: inline-flexbox; color: #2d521c; font-size: 15px; margin-top: 2px; font-style: italic;">Your one-stop solution for buying and selling items</span>
+            </div>
+            <nav>
+                <a href="index.html">Home</a> 
+                <a href="listing.html">Browse Listings</a>
+                <a href="#">My Account</a> <!--- Login/Logout -->
+                <a href="#">Help</a>
+            </nav>
+        </header>
+            <main class="container">
+                <section class="search-row">
+                    <input id="searchinput" type="Search" placeholder="Search items..."> <!--- need add style-->
+                    <select id="filter-">
+                        <option value="">All unit</option>
+                        <option value="kg">kg</option>
+                        <option value="m">meters</option>
+                        <option value="liters">liters</option>
+                        <option value="pcs">pieces</option>
+                        <option value="other">other</option>
+                    </select>
+                    <select id="sortby">
+                        <option value="newest">Newest</option>
+                        <option value="oldest">Oldest</option>
+                        <option value="highestprice">Highest Price</option>
+                        <option value="lowestprice">Lowest Price</option>
+                    </select>
+                    <section id ="listings" class="listings-grid" aria-live="polite">
+                        <!-- Після пошуку показати результата -->
+                    </section>
+                    <nav class="navigation" aria-label="Pagination">
+                        <div class="pagination" role="group" aria-label="Page controls">
+                            <button class="page-btn" id="prevpage" aria-label="Previous page" disabled>Previous</button>
+                            <span class="page-status" aria-live="polite"> Page <span id="currentpage"> 1 </span> of <span id="totalpages">1</span> </span>
+                            <button class="page-btn" id="nextpage" aria-label="Next page">Next</button>
                         </div>
-                        <div class="orderinputs">
-                            <label for="amount">Amount:</label>
-                            <input type="number" id="amount" name="amount" step="0.1" min="0" required>
-                        </div>
-                        <button type="submit">Place Order</button>
-                    </form>
-                </div>
+                    </nav>
+                </main>
+                <script type = "module">
+                    // modules for listings
+                    // async fetch listing
+                        </script>
+                    </nav>
             </main>
-            <script src="script.js"></script>
     </body>
 </html>
