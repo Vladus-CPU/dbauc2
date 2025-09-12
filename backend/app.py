@@ -1,8 +1,8 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-import MYSQL.connector
-from MYSQL.connector import Error, pooling, connect
-from config import DB_CONFIG
+import mysql.connector
+from mysql.connector import Error, pooling, connect
+from config import DB_CONFIG 
 from errors import AppError, OrderDataError, DBError, ErrorRoutes
 
 app = Flask(__name__)
