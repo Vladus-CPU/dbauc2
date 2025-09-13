@@ -8,22 +8,30 @@
         <link rel="stylesheet" href="css/style.css">
     </head>
     <body>
-        <header class ="site-header">
-            <div style="display: flow-root;gap: 12px; align-items: center;">
-                <h1 class="site-title" style="margin: 0; font-size: 28px; font-weight: 880; letter-spacing: 1px; color: #2b7;">Auction House</h1>
-                <span class="site-description" style="display: inline-flexbox; color: #2d521c; font-size: 15px; margin-top: 2px; font-style: italic;">Your one-stop solution for buying and selling items</span>
+        <header class="site-header">
+            <div class="logo">
+                <div class="title-wrap">
+                    <div style="display: flow-root;gap: 12px; align-items: center;">
+                        <h1 class="site-title" style="margin: 0; font-size: 28px; font-weight: 880; letter-spacing: 1px; color: #2b7;">Auction House</h1>
+                        <span class="site-description" style="display: inline-flexbox; color: #2d521c; font-size: 15px; margin-top: 2px; font-style: italic;">Your one-stop solution for buying and selling items</span>
+                    </div>
+                </div>
             </div>
-            <nav>
-                <a href="index.html">Home</a> 
+            <nav aria-label="Main navigation">
+                <a href="index.html">Home</a>
                 <a href="listing.html">Browse Listings</a>
-                <a href="#">My Account</a> <!--- Login/Logout -->
+                <a href="#">My Account</a>
                 <a href="#">Help</a>
             </nav>
         </header>
             <main class="container">
+                <section class="intro">
+                    <h2>Welcome to Auction House</h2>
+                    <p>Your one-stop solution for buying and selling items. Explore our extensive listings, place bids, and manage your account with ease.</p>
+                </section>
                 <section class="search-row">
-                    <input id="searchinput" type="Search" placeholder="Search items..."> <!--- need add style-->
-                    <select id="filter-">
+                    <input id="searchinput" type="search" placeholder="Search items..." aria-label="Search items"> <!--- need add style-->
+                    <select id="filter">
                         <option value="">All unit</option>
                         <option value="kg">kg</option>
                         <option value="m">meters</option>
@@ -37,7 +45,8 @@
                         <option value="highestprice">Highest Price</option>
                         <option value="lowestprice">Lowest Price</option>
                     </select>
-                    <section id ="listings" class="listings-grid" aria-live="polite">
+                </section>
+                <section id ="listings" class="listings-grid" aria-live="polite">
                         <!-- Після пошуку показати результата -->
                     </section>
                     <nav class="navigation" aria-label="Pagination">
@@ -48,11 +57,6 @@
                         </div>
                     </nav>
                 </main>
-                <script type = "module">
-                    // modules for listings
-                    // async fetch listing
-                        </script>
-                    </nav>
-            </main>
+            <script type="module" src="script.js"></script>
     </body>
 </html>

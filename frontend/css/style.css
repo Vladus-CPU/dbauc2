@@ -1,8 +1,11 @@
 .container {
-    max-width: 1100px;
-    margin : 20px auto;
-    padding: 15px;
+    max-width: 1800px;
+    margin: 20px auto;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
 }
+
 header.site-header {
     display: flex;
     justify-content: space-between;
@@ -10,16 +13,19 @@ header.site-header {
     padding: 14px 20px;
     background: rgba(255, 255, 255, 0.9);
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-radius: 2px;
 }
 header nav a {
-    margin-left:12px;
-    text-decoration:none;
-    color:#333
+    margin-left: 16px;
+    text-decoration: none;
+    color: #333;
+    font-weight: 500;
+    transition: color 0.3s;
 }
 .search-row {
-    display:flex;
-    gap:12px;
-    margin:18px 0
+    display: flex;
+    gap: 12px;
+    margin: 18px 0;
 }
 .search-row input, .search-row select {
     padding:10px;
@@ -75,4 +81,69 @@ header nav a {
     border:1px solid #ddd;
     background:#fff;
     cursor:pointer;
+}
+.title-wrap {
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+}
+.site-title {
+    margin:0;
+    font-size:28px;
+    font-weight:800;
+    letter-spacing:1px;
+    color:#2b7;
+}
+.site-description {
+    color:#2d521c;
+    font-size:15px;
+    margin-top:2px;
+    font-style:italic;
+}
+.card img {
+    border-radius:6px;
+    display:block;
+    margin-bottom:8px;
+}
+.card .price {
+    font-weight:700;
+    color:#2b7;
+}
+.empty {
+    grid-column: 1 / -1;
+}
+
+.intro {
+    text-align: center;
+    padding: 15px;
+    margin-bottom: 20px;
+    background: rgba(0,0,0,0.15);
+    border-radius: 8px;
+}
+body {
+    color: #e0e0e0;
+}
+
+.logo {
+    display: flex;
+    flex-direction: column;
+}
+
+.site-description {
+    color: #9dbca9;
+    font-size: 14px;
+    font-style: italic;
+    margin-top: 2px;
+}
+
+header nav a {
+    margin-left: 16px;
+    text-decoration: none;
+    color: #e0e0e0;
+    font-weight: 500;
+    transition: color 0.3s;
+}
+
+header nav a:hover {
+    color: #2bb777;
 }
