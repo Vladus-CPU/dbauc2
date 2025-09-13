@@ -3,12 +3,13 @@ body {
     padding: 0;
     box-sizing: border-box;
     font-family: 'Italic', sans-serif;
+    background: #1a551a;
     background: linear-gradient(135deg, #0a1f0a 0%, #1a3a1a 25%, #2d4a2d 50%, #1a3a1a 75%, #0a1f0a 100%);
     background-size: 300% 300%;
     min-height: 100vh;
     position: relative;
     overflow-x: hidden;
-    animation: gradientShift 25s ease infinite;
+    animation: gradientShift 20s ease infinite;
 }
 
 @keyframes gradientShift {
