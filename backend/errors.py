@@ -34,17 +34,17 @@ def RegisterErrorRoutes(app):
     def ErrorResponse(err):
         response = jsonify(err.errorlist())
         response.status_code = err.statuscode
-        print("AppError: {err.message} (Status: {err.statuscode})")
+        print(f"AppError: {err.message} (Status: {err.statuscode})")
         return response
 
     @app.errorhandler(404)
     def NotFoundResponse(err):
-        print("Not Found Error: {err}")
+        print(f"Not Found Error: {err}")
         return jsonify({"error": "404"}), 404
 
     @app.errorhandler(Exception)
     def GenericErrorResponse(err):
-        print("Generic Error: {err}")
+        print(f"Generic Error: {err}")
         traceback.print_exception()
         response = jsonify({"error": "Server error", "details": str(err)})
         response.status_code = 500
