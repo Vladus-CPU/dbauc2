@@ -1,8 +1,29 @@
-<link rel="stylesheet" href="css/backgroundstyle.css">
-<h2>Buy Orders</h2>
-                    <table id="bidstable">
-                        <thead>
-                            <tr>
+<!DOCTYPE html>
+<html lang="uk">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Auction House - Listings</title>
+        <link rel="stylesheet" href="css/style.css">
+        <link rel="stylesheet" href="css/backgroundstyle.css">
+    </head>
+    <body>   
+        <header class ="site-header">
+            <div style="display: flow-root;gap: 12px; align-items: center;">
+                <h1 class="site-title" style="margin: 0; font-size: 28px; font-weight: 880; letter-spacing: 1px; color: #2b7;">Auction House</h1>
+                <span class="site-description" style="display: inline-flexbox; color: #2d521c; font-size: 15px; margin-top: 2px; font-style: italic;">Your one-stop solution for buying and selling items</span>
+            </div>
+            <nav>
+                <a href="index.html">Home</a> 
+                <a href="listing.html">Browse Listings</a>
+                <a href="#">My Account</a> <!--- Login/Logout -->
+                <a href="#">Help</a>
+            </nav>
+        </header>
+        <h2>Buy Orders</h2>
+        <table id="bidstable">
+            <thead>
+                <tr>
                                 <!--- пропадає при перемиканні, перемикаєця на sell orders-->
                                 <th>Price</th>
                                 <th>Amount</th>

@@ -6,98 +6,12 @@
         <title>Auction House - Main Page</title>
         <link rel="stylesheet" href="css/backgroundstyle.css">
         <link rel="stylesheet" href="css/style.css">
-        <style>
-            body { 
-                background-color: #f6f7f9; 
-                font-family: Inter, sans-serif;
-                margin: 0;
-                color : #333;
-                .container {
-                    max-width: 1100px;
-                    margin : 20px auto;
-                    padding: 15px;
-                }
-                header.site-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    background-color: #f6f7f9;
-                    padding: 14px 20px;
-                    border-bottom: 1px solid #eee;
-                }
-                header nav a {
-                    margin-left:12px;
-                    text-decoration:none;
-                    color:#333
-                }
-                .search-row {
-                    display:flex;
-                    gap:12px;
-                    margin:18px 0
-                }
-                .search-row input, .search-row select {
-                    padding:10px;
-                    border-radius:8px;
-                    border:1px solid #ddd
-                }
-                .listings-grid {
-                    display:grid;
-                    grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
-                    gap:16px
-                }
-                .card {
-                    background:#fff;
-                    padding:12px;
-                    border-radius:8px;
-                    box-shadow:0 1px 3px rgba(0,0,0,0.04)
-                }
-                .card h3 {
-                    margin:0 0 8px 0;
-                    font-size:16px
-                }
-                .meta {
-                    font-size:13px;
-                    color:#666;
-                    margin-bottom:8px
-                }
-                .card .price {
-                    font-weight:600;
-                    margin-right:8px
-                }
-                .btn {
-                    display:inline-block;
-                    padding:8px 10px;
-                    border-radius:6px;
-                    background:#2b7;
-                    color:#fff;
-                    text-decoration:none
-                }
-                .empty {
-                    padding:24px;
-                    text-align:center;
-                    color:#666
-                }
-                .pagination {
-                    display:flex;
-                    gap:8px;
-                    justify-content:center;
-                    margin-top:18px
-                }
-                .page-btn {
-                    padding:8px 10px;
-                    border-radius:6px;
-                    border:1px solid #ddd;
-                    background:#fff;
-                    cursor:pointer;
-                }
-            }
-        </style>
     </head>
     <body>
         <header class ="site-header">
             <div style="display: flow-root;gap: 12px; align-items: center;">
-                <h1 style="margin: 0; font-size: 28px; font-weight: 880; letter-spacing: 1px; color: #2b7;">Auction House</h1>
-                <span style="display: inline-flexbox; color: #2d521c; font-size: 15px; margin-top: 2px; font-style: italic;">Your one-stop solution for buying and selling items</span>
+                <h1 class="site-title" style="margin: 0; font-size: 28px; font-weight: 880; letter-spacing: 1px; color: #2b7;">Auction House</h1>
+                <span class="site-description" style="display: inline-flexbox; color: #2d521c; font-size: 15px; margin-top: 2px; font-style: italic;">Your one-stop solution for buying and selling items</span>
             </div>
             <nav>
                 <a href="index.html">Home</a> 

@@ -12,6 +12,7 @@ body {
     animation: gradientShift 20s ease infinite;
 }
 
+
 @keyframes gradientShift {
     0% { background-position: 0% 25%; }
     25% { background-position: 25% 50%; }
@@ -38,6 +39,7 @@ body::before {
     animation: particleFloat 35s linear infinite;
     pointer-events: none;
     z-index: -2;
+    will-change: transform;
 }
 
 @keyframes particleFloat {
@@ -49,7 +51,6 @@ body::before {
 }
 
 body::after {
-    content: '';
     position: fixed;
     top: 0;
     left: 0;
@@ -58,12 +59,7 @@ body::after {
     background: 
         radial-gradient(ellipse at 20% 80%, rgba(46, 125, 50, 0.06) 0%, transparent 50%),
         radial-gradient(ellipse at 80% 20%, rgba(76, 175, 80, 0.04) 0%, transparent 50%),
-        linear-gradient(45deg, 
-            transparent 30%, 
-            rgba(46, 125, 50, 0.02) 40%, 
-            rgba(56, 142, 60, 0.03) 50%, 
-            rgba(46, 125, 50, 0.02) 60%,
-            transparent 70%);
+        linear-gradient(45deg, transparent 30%, rgba(46, 125, 50, 0.02) 40%, rgba(56, 142, 60, 0.03) 50%, rgba(46, 125, 50, 0.02) 60%, transparent 70%);
     background-size: 800px 600px, 600px 800px, 200px 200px;
     animation: organicFlow 20s ease-in-out infinite;
     pointer-events: none;
@@ -91,18 +87,11 @@ body::after {
     left: 0;
     width: 100%;
     height: 100%;
-    background-image: 
-        repeating-linear-gradient(
-            45deg,
-            transparent,
-            transparent 50px,
-            rgba(46, 125, 50, 0.01) 52px,
-            rgba(46, 125, 50, 0.01) 54px,
-            transparent 56px
-        );
+    background-image: repeating-linear-gradient(45deg, transparent, transparent 50px, rgba(46, 125, 50, 0.01) 52px, rgba(46, 125, 50, 0.01) 54px, transparent 56px);
     animation: patternSlide 40s linear infinite;
     pointer-events: none;
     z-index: -3;
+    will-change: transform;
 }
 
 @keyframes patternSlide {
