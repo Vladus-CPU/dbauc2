@@ -61,6 +61,10 @@ export function createListingCard(item) {
     checkButton.style.cursor = 'pointer';
     checkButton.style.transition = 'background-color 0.3s';
     checkButton.style.transform = 'scale(1)';
+    checkButton.addEventListener('click', function (e) {
+        e.stopPropagation();
+        window.location.href = `item.html?id=${data.id || ''}`;
+    });
     checkButton.onmouseover = function () {
         checkButton.style.backgroundColor = '#218838';
         checkButton.style.transform = 'scale(1.05)';
