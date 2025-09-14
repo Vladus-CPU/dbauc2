@@ -9,6 +9,7 @@ export function createListingCard(item) {
     const img = document.createElement('img');
     const placeholderImg = 'images/placeholder.png';
     img.loading = 'lazy';
+    img.decoding = 'async';
     img.src = (typeof data.image === 'string' && data.image.trim()) ? data.image : placeholderImg;
     img.alt = titleText || 'Item Image';
     img.onerror = function () {
