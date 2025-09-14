@@ -4,19 +4,20 @@ export function createListingCard(item) {
 
     const card = document.createElement('article');
     card.className = 'card';
+    const wrapper = document.createElement('div');
+    wrapper.className = 'image-wrapper';
     const img = document.createElement('img');
     const placeholderImg = 'images/placeholder.png';
     img.loading = 'lazy';
     img.src = (typeof data.image === 'string' && data.image.trim()) ? data.image : placeholderImg;
     img.alt = titleText || 'Item Image';
-    img.width = 300;
-    img.height = 100;
     img.onerror = function () {
         img.onerror = null;
         img.src = placeholderImg;
         img.alt = 'No image';
     };
-    card.appendChild(img);
+    wrapper.appendChild(img);
+    card.appendChild(wrapper);
     const title = document.createElement('h3');
     title.textContent = titleText;
     card.appendChild(title);
