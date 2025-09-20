@@ -9,7 +9,7 @@
     </head>
     <body>
         <header class="site-header">
-            <div class="logo">
+            <div class="logo">    
                 <div class="title-wrap">
                     <div style="display: flow-root;gap: 12px; align-items: center;">
                         <h1 class="site-title" style="margin: 0; font-size: 28px; font-weight: 880; letter-spacing: 1px; color: #2b7;">Auction House</h1>
@@ -18,45 +18,61 @@
                 </div>
             </div>
             <nav aria-label="Main navigation">
-                <a href="index.html">Home</a>
-                <a href="listing.html">Browse Listings</a>
-                <a href="#">My Account</a>
-                <a href="#">Help</a>
+                <a href="index.html" class="nav-link active">Home</a>
+                <a href="listing.html" class="nav-link">Browse listings</a>
+                <a href="account.html" class="nav-link">My Account</a>
+                <a href="help.html" class="nav-link">Help</a>
             </nav>
         </header>
             <main class="container">
                 <section class="intro">
-                    <h2>Welcome to Auction House</h2>
-                    <p>Your one-stop solution for buying and selling items. Explore our extensive listings, place bids, and manage your account with ease.</p>
+                    <div class="intro-text">
+                        <h2>Welcome to Auction House</h2>
+                        <p>Your one-stop solution for buying and selling items. Explore our extensive listings, place bids, and manage your account with ease.</p>
+                        <a href="listing.html" class="btn btn-primary">Browse Listings</a>
+                    </div>
                 </section>
-                <section class="search-row">
-                    <input id="searchinput" type="search" placeholder="Search items..." aria-label="Search items"> <!--- need add style-->
-                    <select id="filter">
-                        <option value="">All unit</option>
-                        <option value="kg">kg</option>
-                        <option value="m">meters</option>
-                        <option value="liters">liters</option>
-                        <option value="pcs">pieces</option>
-                        <option value="other">other</option>
-                    </select>
-                    <select id="sortby">
-                        <option value="newest">Newest</option>
-                        <option value="oldest">Oldest</option>
-                        <option value="highestprice">Highest Price</option>
-                        <option value="lowestprice">Lowest Price</option>
-                    </select>
+                <section class="featured-items">
+                    <h3 class="section-title">Featured Items</h3>
+                    <div class="listings-grid" id="featured-listings">
+                        <div class ="card">Loading...</div>
+                    </div>
                 </section>
-                <section id ="listings" class="listings-grid" aria-live="polite">
-                        <!-- Після пошуку показати результата -->
-                    </section>
-                    <nav class="navigation" aria-label="Pagination">
-                        <div class="pagination" role="group" aria-label="Page controls">
-                            <button class="page-btn" id="prevpage" aria-label="Previous page" disabled>Previous</button>
-                            <span class="page-status" aria-live="polite"> Page <span id="currentpage"> 1 </span> of <span id="totalpages">1</span> </span>
-                            <button class="page-btn" id="nextpage" aria-label="Next page">Next</button>
-                        </div>
-                    </nav>
-                </main>
-            <script type="module" src="js/pages/index.js"></script>
+                <section class="how-it-works">
+                <h3 class="section-title">How It Works</h3>
+                <div class="steps">
+                    <div class="step">
+                    <div class="step-icon">1</div>
+                        <h4>Submit Orders</h4>
+                        <p>Buyers post bids (price + qty), sellers post asks — all active in the orderbook.</p>
+                    </div>
+                    <div class="step" role="listitem">
+                    <div class="step-icon">2</div>
+                        <h4>View Orderbook</h4>
+                        <p>See aggregated bids & asks in real time — click a price to autofill the form.</p>
+                    </div>
+                    <div class="step" role="listitem">
+                    <div class="step-icon">3</div>
+                        <h4>Run Clearing</h4>
+                        <p>System finds the clearing price (where demand = supply) and computes matched volume.</p>
+                    </div>
+                    <div class="step" role="listitem">
+                    <div class="step-icon">4</div>
+                        <h4>Allocate & Execute</h4>
+                        <p>Orders are allocated, trades are recorded and both sides get confirmation.</p>
+                    </div>
+                    <div class="step" role="listitem">
+                    <div class="step-icon">5</div>
+                        <h4>Settlement & History</h4>
+                        <p>Update remaining order quantities, store trades, and show trade log / receipts to users.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+        <footer class="site-footer-main">
+            <div class="footer-content">
+                <p>&copy; 2025 Auction House. All Rights Reserved.</p>
+            </div>
+        </footer>
     </body>
 </html>
