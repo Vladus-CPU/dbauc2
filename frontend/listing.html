@@ -4,28 +4,53 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Auction House - Listings</title>
-        <link rel="stylesheet" href="css/style.css">
         <link rel="stylesheet" href="css/backgroundstyle.css">
+        <link rel="stylesheet" href="css/style.css">
+        <link rel="stylesheet" href="css/listing-card.css">
     </head>
     <body>   
-        <header class ="site-header">
+        <header class="site-header">
             <div class="logo">
-                <div style="display: flow-root;gap: 12px; align-items: center;">
-                    <h1 class="site-title" style="margin: 0; font-size: 28px; font-weight: 880; letter-spacing: 1px; color: #2b7;">Auction House</h1>
-                    <span class="site-description" style="display: inline-flexbox; color: #2d521c; font-size: 15px; margin-top: 2px; font-style: italic;">Your one-stop solution for buying and selling items</span>
+                <div class="title-wrap">
+                    <h1 class="site-title">Auction House</h1>
+                    <span class="site-description">Your one-stop solution for buying and selling items</span>
                 </div>
             </div>
-            <nav>
-                <a href="index.html">Home</a> 
-                <a href="listing.html">Browse Listings</a>
-                <a href="#">My Account</a> <!--- Login/Logout -->
-                <a href="#">Help</a>
+            <nav aria-label="Main navigation">
+                <a href="index.html" class="nav-link">Home</a>
+                <a href="listing.html" class="nav-link active">Browse listings</a>
+                <a href="#" class="nav-link">My Account</a>
+                <a href="#" class="nav-link">Help</a>
             </nav>
         </header>
         <main>
-            <div id="listings-container" class="card-container">
-                <!-- Listing cards will be inserted here by JavaScript -->
-            </div>
+            <section class="create-listing" style="max-width: 900px; margin: 0 auto 24px;">
+                <h2 style="margin-bottom:12px;">Create a new lot</h2>
+                <form id="create-listing-form" style="display:grid; grid-template-columns: repeat(6, 1fr); gap: 12px; align-items: end;">
+                    <div style="grid-column: span 3;">
+                        <label for="title" class="sr-only">Title</label>
+                        <input id="title" name="title" type="text" placeholder="Title" required style="width:100%; padding:8px;">
+                    </div>
+                    <div style="grid-column: span 2;">
+                        <label for="startingBid" class="sr-only">Starting Bid</label>
+                        <input id="startingBid" name="startingBid" type="number" step="0.01" min="0" placeholder="Starting Bid" required style="width:100%; padding:8px;">
+                    </div>
+                    <div>
+                        <label for="unit" class="sr-only">Unit</label>
+                        <input id="unit" name="unit" type="text" placeholder="Unit (pcs, kg, etc)" required style="width:100%; padding:8px;">
+                    </div>
+                    <div style="grid-column: span 6;">
+                        <label for="description" class="sr-only">Description</label>
+                        <textarea id="description" name="description" rows="2" placeholder="Description (optional)" style="width:100%; padding:8px;"></textarea>
+                    </div>
+                    <div style="grid-column: span 6; display:flex; gap:12px;">
+                        <input id="image" name="image" type="url" placeholder="Image URL (optional)" style="flex:1; padding:8px;">
+                        <button type="submit" class="btn btn-primary">Create</button>
+                    </div>
+                </form>
+                <div id="create-feedback" aria-live="polite" style="margin-top:8px; font-size:0.95em;"></div>
+            </section>
+            <div id="listings-container" class="card-container"></div>
         </main>
         <script type="module" src="js/pages/listings.js"></script>
     </body>

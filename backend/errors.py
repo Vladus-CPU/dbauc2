@@ -45,7 +45,7 @@ def RegisterErrorRoutes(app):
     @app.errorhandler(Exception)
     def GenericErrorResponse(err):
         print(f"Generic Error: {err}")
-        traceback.print_exception()
+        traceback.print_exc()
         response = jsonify({"error": "Server error", "details": str(err)})
         response.status_code = 500
         return response
