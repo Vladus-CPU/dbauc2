@@ -3,11 +3,43 @@ from flask_cors import CORS
 import mysql.connector
 from mysql.connector import Error, pooling, connect
 from config import DB_CONFIG 
-from errors import AppError, OrderDataError, DBError, ErrorRoutes
+from errors import AppError, OrderDataError, DBError, RegisterErrorRoutes
 
 app = Flask(__name__)
-ErrorRoutes(app)
+RegisterErrorRoutes(app)
 CORS(app)
+
+listings_data = [
+    {
+        "id": 1,
+        "title": "Vintage Leather Jacket",
+        "startingBid": 50.00,
+        "currentBid": 75.00,
+        "image": "images/jacket.jpg",
+        "unit": "piece"
+    },
+    {
+        "id": 2,
+        "title": "Antique Pocket Watch",
+        "startingBid": 120.00,
+        "currentBid": 150.00,
+        "image": "images/watch.jpg",
+        "unit": "piece"
+    },
+    {
+        "id": 3,
+        "title": "Signed Baseball",
+        "startingBid": 30.00,
+        "currentBid": 45.00,
+        "image": "images/baseball.jpg",
+        "unit": "piece"
+    }
+]
+
+@app.route('/listings', methods=['GET'])
+def get_listings():
+    return jsonify(listings_data)
+
 def db_connection():
     try:
         connection = connect(**DB_CONFIG)
@@ -16,7 +48,7 @@ def db_connection():
     except Error as exception:
         print("Error while connecting to MySQL", exception)
         return None
-# переїбашу на модулі 
+# на модулі 
 @app.route('/api/orders', methods=['GET'])
 def get_orders():
     connection = db_connection()
@@ -74,3 +106,7 @@ def create_order():
     finally:
         cursor.close()
         connection.close()
+        
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
