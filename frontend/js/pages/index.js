@@ -1,27 +1,22 @@
-import { state, setQuery, setFilterUnit, setSortBy, nextPage, prevPage } from '../state.js';
+import { getListings } from '../api.js';
 import { createListingCard } from '../ui/listingCard.js';
 
-function seedItems() {
-  const units = ['kg', 'm', 'liters', 'pcs', 'other'];
-  const now = Date.now();
-state.items = Array.from({ length: 24 }).map((_, index) => ({
-    id: index + 1,
-    title: `Test Item ${index + 1}`,
-    description: `Description for test item ${index + 1}`,
-    startingBid: +(Math.random() * 500000 + 50).toFixed(2),
-    currentBid: index % 3 === 0 ? +(Math.random() * 100000 + 100).toFixed(2) : null,
-    unit: units[index % units.length],
-    createdAt: new Date(now - index * 1000 * 60 * 60 * 24).toISOString(),
-    image: 'images/test-item.jpg',
-}));
-}
-function renderListings() {
-    const listingsContainer = document.getElementById('listings');
-    state.items.forEach(item => {
-        const card = createListingCard(item);
-        listingsContainer.appendChild(card);
-    });
-}
-
-seedItems();
-renderListings();
+document.addEventListener('DOMContentLoaded', async () => {
+    const container = document.getElementById('featured-listings');
+    if (!container) return;
+    container.innerHTML = '';
+    try {
+        const listings = await getListings();
+        const featured = (listings || []).slice(0, 6);
+        if (featured.length === 0) {
+            container.textContent = 'No listings yet. Be the first to create one!';
+            return;
+        }
+        for (const item of featured) {
+            container.appendChild(createListingCard(item));
+        }
+    } catch (err) {
+        console.error('Failed to load featured listings', err);
+        container.textContent = 'Failed to load featured listings.';
+    }
+});
