@@ -1,11 +1,13 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, g
 from flask_cors import CORS
-import mysql.connector
-from mysql.connector import Error, pooling, connect
+from mysql.connector import Error, connect
 from config import DB_CONFIG 
 from errors import AppError, OrderDataError, DBError, RegisterErrorRoutes
 from flask import send_from_directory, abort
 import os
+import datetime
+import jwt
+from passlib.hash import bcrypt
 
 app = Flask(__name__)
 RegisterErrorRoutes(app)
@@ -64,6 +66,43 @@ def ensure_listings_table(connection):
     finally:
         cursor.close()
 
+def ensure_users_table(connection):
+    cursor = connection.cursor()
+    try:
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                username VARCHAR(64) NOT NULL UNIQUE,
+                email VARCHAR(255) NULL UNIQUE,
+                password_hash VARCHAR(255) NOT NULL,
+                is_admin BOOLEAN NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """
+        )
+        connection.commit()
+    finally:
+        cursor.close()
+
+def try_add_owner_columns(connection):
+    """Best-effort add owner/creator columns if missing (dev convenience)."""
+    cur = connection.cursor()
+    try:
+        try:
+            cur.execute("ALTER TABLE listings ADD COLUMN owner_id INT NULL")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_listings_owner ON listings(owner_id)")
+        except Exception:
+            pass
+        try:
+            cur.execute("ALTER TABLE orders ADD COLUMN creator_id INT NULL")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_orders_creator ON orders(creator_id)")
+        except Exception:
+            pass
+        connection.commit()
+    finally:
+        cur.close()
+
 
 def ensure_orders_table(connection):
     """Create orders table for global double auction if it doesn't exist."""
@@ -113,6 +152,78 @@ def ensure_trades_table(connection):
     finally:
         cursor.close()
 
+JWT_SECRET = os.environ.get('JWT_SECRET', 'dev_secret_change_me')
+JWT_ALGO = 'HS256'
+JWT_TTL_MIN = int(os.environ.get('JWT_TTL_MIN', '60'))
+
+def create_token(user):
+    now = datetime.datetime.now(datetime.timezone.utc)
+    exp = now + datetime.timedelta(minutes=JWT_TTL_MIN)
+    payload = {
+        'sub': user['id'],
+        'username': user['username'],
+        'is_admin': int(user.get('is_admin', 0)),
+        'iat': int(now.timestamp()),
+        'exp': int(exp.timestamp()),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
+
+def decode_token(token):
+    try:
+        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
+    except Exception as e:
+        raise AppError("Invalid or expired token", statuscode=401, details=str(e))
+
+
+def get_auth_user(connection):
+    """Parse Authorization header and set g.user if token valid. Return user dict or None."""
+    auth = request.headers.get('Authorization', '')
+    if not auth.startswith('Bearer '):
+        return None
+    token = auth.split(' ', 1)[1].strip()
+    data = decode_token(token)
+    user_id = data.get('sub')
+    cur = connection.cursor(dictionary=True)
+    try:
+        cur.execute("SELECT id, username, email, is_admin, created_at FROM users WHERE id=%s", (user_id,))
+        user = cur.fetchone()
+        g.user = user
+        return user
+    finally:
+        cur.close()
+
+
+def require_auth(f):
+    from functools import wraps
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        conn = db_connection()
+        try:
+            ensure_users_table(conn)
+            user = get_auth_user(conn)
+            if not user:
+                raise AppError("Unauthorized", statuscode=401)
+            return f(*args, **kwargs)
+        finally:
+            conn.close()
+    return wrapper
+
+
+def require_admin(f):
+    from functools import wraps
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        conn = db_connection()
+        try:
+            ensure_users_table(conn)
+            user = get_auth_user(conn)
+            if not user or int(user.get('is_admin', 0)) != 1:
+                raise AppError("Forbidden", statuscode=403)
+            return f(*args, **kwargs)
+        finally:
+            conn.close()
+    return wrapper
+
 
 def row_to_listing(row):
     """Map DB row (dict) to API shape expected by frontend."""
@@ -159,6 +270,15 @@ def api_get_listings():
 
 @app.route('/api/listings', methods=['POST'])
 def api_create_listing():
+    conn_auth = db_connection()
+    try:
+        ensure_users_table(conn_auth)
+        user = get_auth_user(conn_auth)
+        if not user:
+            raise AppError("Unauthorized", statuscode=401)
+        owner_id = user['id']
+    finally:
+        conn_auth.close()
     data = request.get_json(silent=True) or {}
     title = data.get('title')
     starting_bid = data.get('startingBid')
@@ -176,10 +296,11 @@ def api_create_listing():
     connection = db_connection()
     try:
         ensure_listings_table(connection)
+        try_add_owner_columns(connection)
         cursor = connection.cursor()
         sql = (
-            "INSERT INTO listings (title, description, starting_bid, current_bid, unit, image) "
-            "VALUES (%s, %s, %s, %s, %s, %s)"
+            "INSERT INTO listings (title, description, starting_bid, current_bid, unit, image, owner_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s)"
         )
         values = (
             title.strip(),
@@ -187,7 +308,8 @@ def api_create_listing():
             float(starting_bid),
             None,
             unit.strip(),
-            (image or None)
+            (image or None),
+            owner_id
         )
         cursor.execute(sql, values)
         connection.commit()
@@ -234,6 +356,15 @@ def get_orders():
     
 @app.route('/api/orders', methods=['POST'])
 def create_order():
+    conn_auth = db_connection()
+    try:
+        ensure_users_table(conn_auth)
+        user = get_auth_user(conn_auth)
+        if not user:
+            raise AppError("Unauthorized", statuscode=401)
+        creator_id = user['id']
+    finally:
+        conn_auth.close()
     connection = db_connection()
     dataorders = request.get_json(silent=True) or {}
     ordertype = dataorders.get('type')
@@ -249,11 +380,12 @@ def create_order():
     cursor = connection.cursor()
     try:
         ensure_orders_table(connection)
+        try_add_owner_columns(connection)
         SQL = (
-            "INSERT INTO orders (type, cost, amount, remaining_amount, status) "
-            "VALUES (%s, %s, %s, %s, %s)"
+            "INSERT INTO orders (type, cost, amount, remaining_amount, status, creator_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s)"
         )
-        VALUES = (ordertype, float(cost), float(amount), float(amount), 'open')
+        VALUES = (ordertype, float(cost), float(amount), float(amount), 'open', creator_id)
         cursor.execute(SQL, VALUES)
         connection.commit()
         new_id = cursor.lastrowid
@@ -267,6 +399,147 @@ def create_order():
     finally:
         cursor.close()
         connection.close()
+
+@app.route('/api/auth/register', methods=['POST'])
+def register():
+    conn = db_connection()
+    ensure_users_table(conn)
+    data = request.get_json(silent=True) or {}
+    username = (data.get('username') or '').strip()
+    password = data.get('password') or ''
+    email = (data.get('email') or '').strip() or None
+    if not username or not password:
+        raise AppError("Username and password required", statuscode=400)
+    cur = conn.cursor(dictionary=True)
+    try:
+        cur.execute("SELECT id FROM users WHERE username=%s", (username,))
+        if cur.fetchone():
+            return jsonify({"error": "Username already exists"}), 409
+        pwd_hash = bcrypt.hash(password)
+        cur.close()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO users (username, email, password_hash, is_admin) VALUES (%s, %s, %s, %s)",
+            (username, email, pwd_hash, 0)
+        )
+        conn.commit()
+        return jsonify({"message": "Registered"}), 201
+    except Error as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise DBError("Error registering user", details=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    conn = db_connection()
+    ensure_users_table(conn)
+    data = request.get_json(silent=True) or {}
+    username = (data.get('username') or '').strip()
+    password = data.get('password') or ''
+    if not username or not password:
+        raise AppError("Username and password required", statuscode=400)
+    cur = conn.cursor(dictionary=True)
+    try:
+        cur.execute("SELECT id, username, email, password_hash, is_admin, created_at FROM users WHERE username=%s", (username,))
+        user = cur.fetchone()
+        if not user or not bcrypt.verify(password, user['password_hash']):
+            return jsonify({"error": "Invalid credentials"}), 401
+        token = create_token(user)
+        return jsonify({
+            "token": token,
+            "user": {
+                "id": user['id'],
+                "username": user['username'],
+                "email": user['email'],
+                "is_admin": int(user['is_admin']),
+                "created_at": user['created_at'].isoformat() if user['created_at'] else None,
+            }
+        })
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route('/api/auth/me', methods=['GET'])
+def me():
+    conn = db_connection()
+    try:
+        ensure_users_table(conn)
+        user = get_auth_user(conn)
+        if not user:
+            return jsonify({"authenticated": False}), 200
+        return jsonify({"authenticated": True, "user": user})
+    finally:
+        conn.close()
+
+
+# Admin routes
+@app.route('/api/admin/users', methods=['GET'])
+def admin_users():
+    conn_auth = db_connection()
+    try:
+        ensure_users_table(conn_auth)
+        user = get_auth_user(conn_auth)
+        if not user or int(user.get('is_admin', 0)) != 1:
+            raise AppError("Forbidden", statuscode=403)
+    finally:
+        conn_auth.close()
+    conn = db_connection()
+    cur = conn.cursor(dictionary=True)
+    try:
+        cur.execute("SELECT id, username, email, is_admin, created_at FROM users ORDER BY created_at DESC")
+        return jsonify(cur.fetchall())
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route('/api/admin/listings', methods=['GET'])
+def admin_listings():
+    conn_auth = db_connection()
+    try:
+        ensure_users_table(conn_auth)
+        user = get_auth_user(conn_auth)
+        if not user or int(user.get('is_admin', 0)) != 1:
+            raise AppError("Forbidden", statuscode=403)
+    finally:
+        conn_auth.close()
+    conn = db_connection()
+    cur = conn.cursor(dictionary=True)
+    try:
+        ensure_listings_table(conn)
+        cur.execute("SELECT * FROM listings ORDER BY created_at DESC")
+        return jsonify(cur.fetchall())
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route('/api/admin/orders', methods=['GET'])
+def admin_orders():
+    conn_auth = db_connection()
+    try:
+        ensure_users_table(conn_auth)
+        user = get_auth_user(conn_auth)
+        if not user or int(user.get('is_admin', 0)) != 1:
+            raise AppError("Forbidden", statuscode=403)
+    finally:
+        conn_auth.close()
+    conn = db_connection()
+    cur = conn.cursor(dictionary=True)
+    try:
+        ensure_orders_table(conn)
+        cur.execute("SELECT * FROM orders ORDER BY created_at DESC")
+        return jsonify(cur.fetchall())
+    finally:
+        cur.close()
+        conn.close()
         
 
 if __name__ == '__main__':

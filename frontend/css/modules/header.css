@@ -1,0 +1,27 @@
+.site-header {
+    background: rgba(0, 0, 0, 0.6);
+    padding: 15px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(43, 183, 119, 0.2);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    backdrop-filter: blur(10px);
+}
+
+.logo .site-title {
+    font-size: 26px;
+    font-weight: 800;
+    color: #fff;
+    margin: 0;
+    letter-spacing: 1px;
+}
+
+.logo .site-description {
+    font-size: 14px;
+    color: #a0d8b0;
+    margin-top: 2px;
+    font-style: italic;
+}
