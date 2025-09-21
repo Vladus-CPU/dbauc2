@@ -7,7 +7,7 @@ export function createListingCard(item) {
     const wrapper = document.createElement('div');
     wrapper.className = 'image-wrapper';
     const img = document.createElement('img');
-    const placeholderImg = 'images/placeholder.png';
+    const placeholderImg = 'images/placeholder.svg';
     img.loading = 'lazy';
     img.decoding = 'async';
     img.src = (typeof data.image === 'string' && data.image.trim()) ? data.image : placeholderImg;
@@ -52,9 +52,6 @@ export function createListingCard(item) {
     checkButton.type = 'button';
     checkButton.className = 'button';
     checkButton.textContent = 'View Details';
-    checkButton.addEventListener('click', function () {
-        window.location.href = `item.html?id=${data.id || ''}`;
-    });
     checkButton.style.backgroundColor = '#28a745';
     checkButton.style.color = '#fff';
     checkButton.style.border = 'none';

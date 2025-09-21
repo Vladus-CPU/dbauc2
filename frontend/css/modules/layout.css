@@ -1,0 +1,23 @@
+.container {
+    max-width: calc(100% - 200px);
+    margin: calc(0px + 10px) auto;
+    padding: calc(5% - 60px);
+    background: rgba(10, 31, 10, 0.5);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    backdrop-filter: blur(4px) saturate(150%) contrast(120%) brightness(95%);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.search-row {
+    display: flex;
+    gap: 12px;
+    margin: 18px 0;
+}
+
+.search-row input, .search-row select {
+    padding:10px;
+    border-radius:8px;
+    border:1px solid #444;
+    background: rgba(0,0,0,0.2);
+}

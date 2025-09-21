@@ -1,0 +1,45 @@
+.site-footer-main {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 64px;
+    background: #051405;
+    color: #a0d8b0;
+    margin-top: 0;
+    border-top: 1px solid rgba(43, 183, 119, 0.2);
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    backdrop-filter: blur(6px) saturate(120%);
+    padding: 0 12px;
+}
+
+.footer-content {
+    max-width: 1200px;
+    margin: 0;
+    text-align: left;
+    display: flex;
+    gap: 16px;
+    justify-content: flex-start;
+    align-items: center;
+    width: 100%;
+    padding: 0 6px;
+}
+
+.footer-nav {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    margin: 0;
+}
+
+.footer-nav a {
+    text-decoration: none;
+    color: #a0d8b0;
+    transition: color 0.3s;
+}
+
+.footer-nav a:hover {
+    color: #2bb777;
+}

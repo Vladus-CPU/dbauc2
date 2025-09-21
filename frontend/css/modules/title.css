@@ -1,0 +1,55 @@
+.title-wrap {
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+}
+
+.site-title {
+    margin: 40px;
+    font-size: clamp(1.6rem, 2.2vw + 1rem, 2.5rem);
+    font-weight: 1000;
+    letter-spacing: 0.5px;
+    line-height: 0.95;
+    text-align: center;
+    background: linear-gradient(90deg, #144409 0%, #2bb777 60%, #9dbca9 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 6px 20px rgba(43,119,47,0.08);
+    transition: transform .18s ease, text-shadow .18s ease;
+}
+
+.site-title:hover {
+    transform: translateY(-2px);
+    text-shadow: 0 10px 30px rgba(43,119,47,0.12);
+}
+
+.site-title::after {
+    content: "";
+    display: block;
+    width: min(680px, 90%);
+    height: 6px;
+    border-radius: 1000px;
+    margin: 10px auto 0;
+    background: linear-gradient(90deg, #2bb777 0%, #9dbca9 50%, #2bb777 100%);
+    background-size: 200% 100%;
+    box-shadow: 0 2px 14px rgba(43, 183, 119, 0.18);
+    transform: scaleX(0.92);
+    transform-origin: center;
+    transition: transform .25s ease, box-shadow .25s ease, background-position .8s ease;
+    animation: lineSlide 6s linear infinite paused;
+}
+
+.site-title:hover::after, .site-title:focus-visible::after {
+    transform: scaleX(1);
+    box-shadow: 0 4px 24px rgba(43, 183, 119, 0.28);
+    animation-play-state: running;
+}
+
+@keyframes lineSlide {
+    0% { background-position: 0% 50%; }
+    25% { background-position: 50% 50%; }
+    50% { background-position: 100% 50%; }
+    75% { background-position: 50% 50%; }
+    100% { background-position: 200% 50%; }
+}

@@ -1,0 +1,42 @@
+.steps {
+    display: flex;
+    justify-content: space-around;
+    gap: 20px;
+    text-align: center;
+}
+
+.step {
+    background: rgba(0,0,0,0.15);
+    padding: 20px;
+    border-radius: 12px;
+    width: 23%;
+    transition: transform 0.3s, background 0.3s;
+}
+
+.step:hover {
+    transform: translateY(-10px);
+    background: rgba(43, 183, 119, 0.1);
+}
+
+.step-icon {
+    width: 50px;
+    height: 50px;
+    line-height: 50px;
+    border-radius: 50%;
+    background: #2bb777;
+    color: #fff;
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0 auto 15px;
+}
+
+.step h4 {
+    font-size: 18px;
+    color: #e0e0e0;
+    margin-bottom: 10px;
+}
+
+.step p {
+    font-size: 14px;
+    color: #c0e0c8;
+}

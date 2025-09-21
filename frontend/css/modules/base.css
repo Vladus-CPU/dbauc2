@@ -1,0 +1,21 @@
+body {
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #e0e0e0;
+    line-height: 1.6;
+}
+
+:root { --ui-scale: 0.8; }
+@media (min-width: 1024px) {
+    html { zoom: var(--ui-scale); }
+}
+
+@supports not (zoom: 0.8) {
+    @media (min-width: 1024px) {
+        body {
+            transform: scale(var(--ui-scale));
+            transform-origin: top center;
+            width: calc(100% / var(--ui-scale));
+        }
+    }
+}

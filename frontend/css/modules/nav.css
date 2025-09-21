@@ -1,0 +1,27 @@
+.nav-link {
+    margin-left: 20px;
+    text-decoration: none;
+    color: #c0e0c8;
+    font-weight: 500;
+    transition: color 0.3s, text-shadow 0.3s;
+    padding-bottom: 5px;
+    border-bottom: 2px solid transparent;
+}
+
+.nav-link:hover, .nav-link.active {
+    color: #2bb777;
+    text-shadow: 0 0 8px rgba(43, 183, 119, 0.7);
+    border-bottom: 2px solid #2bb777;
+}
+
+header nav a {
+    margin-left: 16px;
+    text-decoration: none;
+    color: #144409;
+    font-weight: 500;
+    transition: color 0.3s;
+}
+
+header nav a:hover {
+    color: #2bb777;
+}

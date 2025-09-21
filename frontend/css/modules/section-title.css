@@ -1,0 +1,21 @@
+.section-title {
+    text-align: center;
+    font-size: 28px;
+    color: #e0e0e0;
+    margin-bottom: 30px;
+    position: relative;
+}
+
+.section-title::after {
+    content: '';
+    display: block;
+    width: 60px;
+    height: 3px;
+    background-color: #2bb777;
+    margin: 8px auto 0;
+    border-radius: 2px;
+}
+
+.how-it-works {
+    padding: 40px 0;
+}
