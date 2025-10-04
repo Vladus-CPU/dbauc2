@@ -1,27 +1,82 @@
-.nav-link {
-    margin-left: 20px;
-    text-decoration: none;
-    color: #c0e0c8;
-    font-weight: 500;
-    transition: color 0.3s, text-shadow 0.3s;
-    padding-bottom: 5px;
-    border-bottom: 2px solid transparent;
+header nav {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
 }
 
-.nav-link:hover, .nav-link.active {
-    color: #2bb777;
-    text-shadow: 0 0 8px rgba(43, 183, 119, 0.7);
-    border-bottom: 2px solid #2bb777;
+.nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    margin-left: 0;
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    transition: color 0.24s ease, background 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease;
+    border: 1px solid transparent;
+    background: transparent;
+}
+
+.nav-link .badge {
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+    padding: 3px 8px;
+}
+
+.nav-link:hover,
+.nav-link:focus-visible {
+    color: var(--text-primary);
+    background: rgba(74, 222, 128, 0.16);
+    border-color: rgba(74, 222, 128, 0.42);
+    box-shadow: 0 12px 24px rgba(62, 180, 120, 0.28);
+    outline: none;
+}
+
+.nav-link.active {
+    color: var(--text-primary);
+    background: rgba(74, 222, 128, 0.22);
+    border-color: var(--surface-border);
+    box-shadow: 0 16px 28px rgba(74, 222, 128, 0.32);
+}
+
+.nav-link--internal {
+    background: rgba(250, 204, 21, 0.16);
+    border-color: rgba(250, 204, 21, 0.36);
+    color: rgba(255, 252, 220, 0.92);
+}
+
+.nav-link--internal:hover,
+.nav-link--internal:focus-visible {
+    background: rgba(250, 204, 21, 0.22);
+    border-color: rgba(250, 204, 21, 0.48);
+    color: rgba(255, 255, 235, 0.96);
+    box-shadow: 0 18px 32px rgba(250, 204, 21, 0.3);
 }
 
 header nav a {
-    margin-left: 16px;
+    color: var(--text-muted);
     text-decoration: none;
-    color: #144409;
     font-weight: 500;
-    transition: color 0.3s;
+    transition: color 0.24s ease;
 }
 
-header nav a:hover {
-    color: #2bb777;
+header nav a:hover,
+header nav a:focus-visible {
+    color: var(--accent);
+    outline: none;
+}
+
+@media (max-width: 720px) {
+    header nav {
+        gap: 8px;
+    }
+
+    .nav-link {
+        width: 100%;
+        justify-content: center;
+    }
 }

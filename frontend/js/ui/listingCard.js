@@ -3,7 +3,7 @@ export function createListingCard(item) {
     const titleText = (data.title || 'No Title');
 
     const card = document.createElement('article');
-    card.className = 'card';
+    card.className = 'listing-card';
     const wrapper = document.createElement('div');
     wrapper.className = 'image-wrapper';
     const img = document.createElement('img');
@@ -24,54 +24,42 @@ export function createListingCard(item) {
     card.appendChild(title);
 
     const metadata = document.createElement('div');
-    metadata.className = 'meta';
+    metadata.className = 'listing-card__meta';
     const bits = [];
     if (typeof data.startingBid === 'number') {
-        bits.push(`Starting Bid: $${data.startingBid.toFixed(2)}`);
+        bits.push({ label: 'Starting Bid', value: `$${data.startingBid.toFixed(2)}` });
     }
     if (data.currentBid && typeof data.currentBid === 'number' && data.currentBid > 0 && data.currentBid > data.startingBid) {
-        bits.push(`Current Bid: $${data.currentBid.toFixed(2)}`);
+        bits.push({ label: 'Current Bid', value: `$${data.currentBid.toFixed(2)}` });
     }
     if (typeof data.unit === 'string' && data.unit.trim()) {
-        bits.push(`Unit: ${data.unit}`);
+        bits.push({ label: 'Unit', value: data.unit });
     }
-    metadata.textContent = bits.join(' | ');
-    metadata.style.fontSize = '0.95em';
-    metadata.style.color = '#555';
-    card.appendChild(metadata);
+    if (bits.length) {
+        bits.forEach(bit => {
+            const line = document.createElement('div');
+            const label = document.createElement('span');
+            label.className = 'listing-card__price';
+            label.textContent = `${bit.label}: `;
+            const value = document.createElement('span');
+            value.textContent = bit.value;
+            line.append(label, value);
+            metadata.appendChild(line);
+        });
+        card.appendChild(metadata);
+    }
     
     const footer = document.createElement('div');
-    footer.className = 'footer';
-    footer.style.display = 'flex';
-    footer.style.justifyContent = 'space-between';
-    footer.style.marginTop = '8px';
-    footer.style.fontSize = '0.85em';
-    footer.style.color = '#777';
+    footer.className = 'listing-card__footer';
 
     const checkButton = document.createElement('button');
     checkButton.type = 'button';
-    checkButton.className = 'button';
+    checkButton.className = 'btn btn-primary btn-compact';
     checkButton.textContent = 'View Details';
-    checkButton.style.backgroundColor = '#28a745';
-    checkButton.style.color = '#fff';
-    checkButton.style.border = 'none';
-    checkButton.style.borderRadius = '4px';
-    checkButton.style.padding = '4px 8px';
-    checkButton.style.cursor = 'pointer';
-    checkButton.style.transition = 'background-color 0.3s';
-    checkButton.style.transform = 'scale(1)';
     checkButton.addEventListener('click', function (e) {
         e.stopPropagation();
         window.location.href = `item.html?id=${data.id || ''}`;
     });
-    checkButton.onmouseover = function () {
-        checkButton.style.backgroundColor = '#218838';
-        checkButton.style.transform = 'scale(1.05)';
-    };
-    checkButton.onmouseout = function () {
-        checkButton.style.backgroundColor = '#28a745';
-        checkButton.style.transform = 'scale(1)';
-    };
     footer.appendChild(checkButton);
 
     card.appendChild(footer);

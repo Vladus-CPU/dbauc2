@@ -1,19 +1,80 @@
 .btn {
-    display: inline-block;
-    padding: 12px 24px;
-    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 22px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
     text-decoration: none;
     font-weight: 600;
-    transition: transform 0.2s, box-shadow 0.2s;
+    letter-spacing: 0.02em;
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+    cursor: pointer;
+    position: relative;
+}
+
+.btn:hover,
+.btn:focus-visible {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.3);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.btn:disabled,
+.btn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
 }
 
 .btn-primary {
-    background: #2bb777;
-    color: #fff;
-    box-shadow: 0 4px 15px rgba(43, 183, 119, 0.4);
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+    color: #012f16;
+    border: none;
+    box-shadow: 0 16px 34px rgba(74, 222, 128, 0.35);
 }
 
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(43, 183, 119, 0.6);
+.btn-primary:hover,
+.btn-primary:focus-visible {
+    transform: translateY(-2px) scale(1.01);
+    box-shadow: 0 22px 44px rgba(74, 222, 128, 0.42);
+    background: linear-gradient(135deg, var(--accent-strong) 0%, var(--accent) 100%);
+}
+
+.btn-ghost {
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn-ghost:hover,
+.btn-ghost:focus-visible {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.btn-danger {
+    background: rgba(255, 92, 92, 0.16);
+    color: #ffbaba;
+    border-color: rgba(255, 92, 92, 0.32);
+    box-shadow: 0 12px 28px rgba(255, 92, 92, 0.18);
+}
+
+.btn-danger:hover,
+.btn-danger:focus-visible {
+    background: rgba(255, 92, 92, 0.24);
+    border-color: rgba(255, 92, 92, 0.4);
+}
+
+.btn-compact {
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 0.9rem;
 }

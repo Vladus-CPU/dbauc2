@@ -17,12 +17,19 @@
       </div>
       <nav>
         <a href="index.html" class="nav-link">Home</a>
-        <a href="listing.html" class="nav-link">Browse Listings</a>
+        <a href="listing.html" class="nav-link nav-link--internal" data-role-required="admin">
+          <span>Inventory</span>
+          <span class="badge badge--outline">INTERNAL</span>
+        </a>
+        <a href="auctions.html" class="nav-link">Auctions</a>
         <a href="account.html" class="nav-link">My Account</a>
-        <a href="admin.html" class="nav-link active">Admin</a>
+        <a href="admin.html" class="nav-link active" data-role-required="admin">Admin</a>
       </nav>
     </header>
     <main class="container">
+      <section class="dashboard-card dashboard-card--header">
+        <div id="admin-profile-summary">Loading...</div>
+      </section>
     </main>
     <script type="module" src="js/pages/admin.js"></script>
   </body>

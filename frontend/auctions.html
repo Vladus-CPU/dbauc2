@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Auctions</title>
+    <link rel="stylesheet" href="css/backgroundstyle.css" />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="logo">
+        <div class="title-wrap">
+          <h1 class="site-title">Auction House</h1>
+          <span class="site-description">Auctions</span>
+        </div>
+      </div>
+      <nav>
+        <a href="index.html" class="nav-link">Home</a>
+        <a href="listing.html" class="nav-link nav-link--internal" data-role-required="admin">
+          <span>Inventory</span>
+          <span class="badge badge--outline">INTERNAL</span>
+        </a>
+        <a href="auctions.html" class="nav-link active">Auctions</a>
+        <a href="account.html" class="nav-link">Profile</a>
+        <a href="admin.html" class="nav-link" data-role-required="admin">Admin</a>
+      </nav>
+    </header>
+    <main class="container auctions-container">
+      <section class="dashboard-card dashboard-card--header">
+        <div class="section-heading">
+          <span class="eyebrow">Live auctions</span>
+          <h2 class="section-heading__title">Торги та кліринги</h2>
+          <p class="section-heading__meta">
+            Слідкуйте за вікнами збору заявок, переглядайте книгу ордерів та подавайте власні заявки у кілька кліків.
+          </p>
+        </div>
+        <div class="hero-actions" id="auction-session-cta"></div>
+      </section>
+
+      <section class="dashboard-card dashboard-card--overview" id="auction-overview">
+        <div class="section-heading">
+          <span class="eyebrow">Overview</span>
+          <h3 class="section-heading__title">Поточний стан ринку</h3>
+        </div>
+        <div class="metrics-grid" id="auction-metrics"></div>
+      </section>
+
+      <section class="dashboard-card" id="collecting-card">
+        <div class="section-heading">
+          <span class="eyebrow">Active windows</span>
+          <h3 class="section-heading__title">Збір заявок</h3>
+          <p class="section-heading__meta">Подавайте заявки, перевіряйте статус участі та відкривайте книгу ордерів.</p>
+        </div>
+        <div class="stack-grid" id="collecting-list"></div>
+      </section>
+
+      <section class="dashboard-card" id="cleared-card">
+        <div class="section-heading">
+          <span class="eyebrow">History</span>
+          <h3 class="section-heading__title">Нещодавно відкліринено</h3>
+          <p class="section-heading__meta">Результати завершених вікон з підсумками цін та обсягів.</p>
+        </div>
+        <div class="stack-grid" id="cleared-list"></div>
+      </section>
+    </main>
+    <script type="module" src="js/pages/auctions.js"></script>
+  </body>
+  </html>

@@ -18,39 +18,206 @@
             </div>
             <nav aria-label="Main navigation">
                 <a href="index.html" class="nav-link">Home</a>
-                <a href="listing.html" class="nav-link active">Browse listings</a>
-                <a href="account.html" class="nav-link">My Account</a>
-                <a href="admin.html" class="nav-link">Admin</a>
+                <a href="listing.html" class="nav-link nav-link--internal active" data-role-required="admin">
+                    <span>Inventory</span>
+                    <span class="badge badge--outline">INTERNAL</span>
+                </a>
+                <a href="auctions.html" class="nav-link">Auctions</a>
+                <a href="account.html" class="nav-link">Profile</a>
+                <a href="admin.html" class="nav-link" data-role-required="admin">Admin</a>
             </nav>
         </header>
-        <main>
-            <section class="create-listing" style="max-width: 900px; margin: 0 auto 24px;">
-                <h2 style="margin-bottom:12px;">Create a new lot</h2>
-                <form id="create-listing-form" style="display:grid; grid-template-columns: repeat(6, 1fr); gap: 12px; align-items: end;">
-                    <div style="grid-column: span 3;">
-                        <label for="title" class="sr-only">Title</label>
-                        <input id="title" name="title" type="text" placeholder="Title" required style="width:100%; padding:8px;">
-                    </div>
-                    <div style="grid-column: span 2;">
-                        <label for="startingBid" class="sr-only">Starting Bid</label>
-                        <input id="startingBid" name="startingBid" type="number" step="0.01" min="0" placeholder="Starting Bid" required style="width:100%; padding:8px;">
-                    </div>
-                    <div>
-                        <label for="unit" class="sr-only">Unit</label>
-                        <input id="unit" name="unit" type="text" placeholder="Unit (pcs, kg, etc)" required style="width:100%; padding:8px;">
-                    </div>
-                    <div style="grid-column: span 6;">
-                        <label for="description" class="sr-only">Description</label>
-                        <textarea id="description" name="description" rows="2" placeholder="Description (optional)" style="width:100%; padding:8px;"></textarea>
-                    </div>
-                    <div style="grid-column: span 6; display:flex; gap:12px;">
-                        <input id="image" name="image" type="url" placeholder="Image URL (optional)" style="flex:1; padding:8px;">
-                        <button type="submit" class="btn btn-primary">Create</button>
-                    </div>
-                </form>
-                <div id="create-feedback" aria-live="polite" style="margin-top:8px; font-size:0.95em;"></div>
+        <main class="inventory-page">
+            <section class="notice notice--internal" role="note" aria-live="polite">
+                <div class="badge badge--outline">INTERNAL TOOL</div>
+                <div>
+                    <h2 class="notice__title">Inventory console</h2>
+                    <p class="notice__body">Ця сторінка призначена для команди, щоб швидко завантажувати або тестувати лоти. Для клієнтів краще надсилати посилання на <a href="auctions.html">активні аукціони</a>.</p>
+                </div>
             </section>
-            <div id="listings-container" class="card-container"></div>
+            <section class="inventory-overview">
+                <div class="inventory-stats" id="inventory-stats">
+                    <article class="inventory-stat">
+                        <span class="inventory-stat__label">Опубліковані</span>
+                        <span class="inventory-stat__value" id="stat-published">0</span>
+                    </article>
+                    <article class="inventory-stat">
+                        <span class="inventory-stat__label">Чернетки</span>
+                        <span class="inventory-stat__value" id="stat-draft">0</span>
+                    </article>
+                    <article class="inventory-stat">
+                        <span class="inventory-stat__label">Архів</span>
+                        <span class="inventory-stat__value" id="stat-archived">0</span>
+                    </article>
+                </div>
+                <ol class="inventory-steps" aria-label="Рекомендований порядок дій">
+                    <li>
+                        <h3>1. Зберіть інформацію про лот</h3>
+                        <p>Створіть або відредагуйте позицію праворуч: назва, одиниця виміру, стартова ціна, опис.</p>
+                    </li>
+                    <li>
+                        <h3>2. Визначте статус</h3>
+                        <p>Чернетка — для підготовки, Опубліковано — видно трейдерам, Архів — приховано з публіки, але збережено для історії.</p>
+                    </li>
+                    <li>
+                        <h3>3. Запустіть аукціон</h3>
+                        <p>Оберіть лот у списку, задайте параметри в блоці «Створити аукціон» та виконайте кліринг уже на сторінці аукціону.</p>
+                    </li>
+                </ol>
+            </section>
+            <section class="inventory-toolbar">
+                <form id="inventory-filters" class="inventory-toolbar__filters" autocomplete="off">
+                    <label>
+                        <span>Пошук</span>
+                        <input type="search" id="filter-search" name="search" placeholder="Назва або опис">
+                    </label>
+                    <label>
+                        <span>Статус</span>
+                        <select id="filter-status" name="status">
+                            <option value="all">Усі</option>
+                            <option value="draft">Чернетки</option>
+                            <option value="published">Опубліковані</option>
+                            <option value="archived">Архів</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Сортування</span>
+                        <select id="filter-sort" name="sort">
+                            <option value="updated_desc">Оновлені ↓</option>
+                            <option value="created_desc">Створені ↓</option>
+                            <option value="created_asc">Створені ↑</option>
+                            <option value="title_asc">Назва A→Z</option>
+                            <option value="title_desc">Назва Z→A</option>
+                            <option value="status">Статус</option>
+                        </select>
+                    </label>
+                </form>
+                <div class="inventory-toolbar__actions">
+                    <button type="button" class="btn btn-ghost btn-compact" id="filter-reset">Очистити</button>
+                    <button type="button" class="btn btn-primary btn-compact" id="new-listing-btn">Новий лот</button>
+                </div>
+            </section>
+            <div class="inventory-grid">
+                <section class="inventory-list" aria-label="Список лотів">
+                    <header class="inventory-list__header">
+                        <div>
+                            <h2 style="margin:0;">Каталог лотів</h2>
+                            <p style="margin:4px 0 0; color: var(--text-muted); font-size:0.9rem;">Керуйте описами, статусами й запускайте аукціони з єдиного місця.</p>
+                        </div>
+                        <div class="inventory-list__meta">
+                            <span id="inventory-total">0</span>
+                            <button type="button" class="btn btn-ghost btn-compact" id="refresh-listings">Оновити</button>
+                        </div>
+                    </header>
+                    <div class="inventory-table-wrapper">
+                        <table class="inventory-table">
+                            <thead>
+                                <tr>
+                                    <th>Лот</th>
+                                    <th>Ціни</th>
+                                    <th>Обсяг</th>
+                                    <th>Аукціони</th>
+                                    <th>Дії</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-table-body">
+                                <tr>
+                                    <td colspan="5" class="inventory-empty">Завантаження…</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="inventory-pagination" id="inventory-pagination" aria-live="polite">
+                        <span></span>
+                        <div class="inventory-pagination__controls"></div>
+                    </div>
+                </section>
+                <aside class="inventory-editor" aria-live="polite">
+                    <header class="inventory-editor__header">
+                        <div>
+                            <h2 id="editor-heading">Новий лот</h2>
+                            <p id="editor-subheading" style="margin:4px 0 0; color: var(--text-muted); font-size:0.9rem;">Заповніть форму або оберіть лот зі списку ліворуч.</p>
+                        </div>
+                        <div id="editor-status-badge"></div>
+                    </header>
+                    <form id="listing-editor-form" novalidate>
+                        <input type="hidden" id="listing-id" name="listingId">
+                        <div class="inventory-form-grid">
+                            <label class="inventory-form-grid--full">
+                                <span>Назва</span>
+                                <input type="text" id="listing-title" name="title" required placeholder="Наприклад: Пшениця, 100 т">
+                            </label>
+                            <label>
+                                <span>Стартова ціна</span>
+                                <input type="number" step="0.01" min="0" id="listing-starting-bid" name="startingBid" required>
+                            </label>
+                            <label>
+                                <span>Одиниця виміру</span>
+                                <input type="text" id="listing-unit" name="unit" required placeholder="т, кг, шт...">
+                            </label>
+                            <label>
+                                <span>Базовий обсяг</span>
+                                <input type="number" step="0.01" min="0" id="listing-base-quantity" name="baseQuantity" placeholder="Необов'язково">
+                            </label>
+                            <label>
+                                <span>Статус</span>
+                                <select id="listing-status" name="status">
+                                    <option value="draft">Чернетка</option>
+                                    <option value="published">Опубліковано</option>
+                                    <option value="archived">Архів</option>
+                                </select>
+                            </label>
+                            <label class="inventory-form-grid--full">
+                                <span>Зображення (URL)</span>
+                                <input type="url" id="listing-image" name="image" placeholder="https://…">
+                            </label>
+                            <label class="inventory-form-grid--full">
+                                <span>Опис</span>
+                                <textarea id="listing-description" name="description" placeholder="Коротко про товар або умови поставки"></textarea>
+                            </label>
+                        </div>
+                        <div class="inventory-editor__actions">
+                            <button type="submit" class="btn btn-primary">Зберегти</button>
+                            <button type="button" class="btn btn-ghost" id="editor-reset">Скинути</button>
+                            <button type="button" class="btn btn-danger" id="editor-delete">Видалити</button>
+                        </div>
+                    </form>
+                    <section class="inventory-meta" id="listing-meta"></section>
+                    <section class="inventory-auction" id="auction-panel">
+                        <div>
+                            <h3>Створити аукціон</h3>
+                            <p class="inventory-auction__note">Запустіть подвійний аукціон на базі цього лоту. Значення k повинно бути в діапазоні [0;1].</p>
+                        </div>
+                        <form id="auction-from-listing-form">
+                            <label>
+                                <span>Тип</span>
+                                <select id="auction-type">
+                                    <option value="open">Відкритий</option>
+                                    <option value="closed">Закритий</option>
+                                </select>
+                            </label>
+                            <label>
+                                <span>k</span>
+                                <input type="number" step="0.01" min="0" max="1" id="auction-k" value="0.5" required>
+                            </label>
+                            <label class="wide">
+                                <span>Вікно старту</span>
+                                <input type="datetime-local" id="auction-window-start">
+                            </label>
+                            <label class="wide">
+                                <span>Вікно завершення</span>
+                                <input type="datetime-local" id="auction-window-end">
+                            </label>
+                            <label class="wide" style="display:flex; align-items:center; gap:8px;">
+                                <input type="checkbox" id="auction-publish" checked>
+                                <span>Опублікувати лот після створення аукціону</span>
+                            </label>
+                            <button type="submit" class="btn btn-ghost">Створити аукціон</button>
+                        </form>
+                        <div class="inventory-auction__note" id="listing-last-auction"></div>
+                    </section>
+                </aside>
+            </div>
         </main>
         <script type="module" src="js/pages/listings.js"></script>
     </body>

@@ -18,9 +18,13 @@
             </div>
             <nav aria-label="Main navigation">
                 <a href="index.html" class="nav-link active">Home</a>
-                <a href="listing.html" class="nav-link">Browse listings</a>
-                <a href="account.html" class="nav-link">My Account</a>
-                <a href="admin.html" class="nav-link">Admin</a>
+                <a href="listing.html" class="nav-link nav-link--internal" data-role-required="admin">
+                    <span>Inventory</span>
+                    <span class="badge badge--outline">INTERNAL</span>
+                </a>
+                <a href="auctions.html" class="nav-link">Auctions</a>
+                <a href="account.html" class="nav-link">Profile</a>
+                <a href="admin.html" class="nav-link" data-role-required="admin">Admin</a>
             </nav>
         </header>
             <main class="container">
@@ -28,7 +32,7 @@
                     <div class="intro-text">
                         <h2>Welcome to Auction House</h2>
                         <p>Your one-stop solution for buying and selling items. Explore our extensive listings, place bids, and manage your account with ease.</p>
-                        <a href="listing.html" class="btn btn-primary">Browse Listings</a>
+                        <a href="auctions.html" class="btn btn-primary">Explore Auctions</a>
                     </div>
                 </section>
                 <section class="featured-items">
@@ -73,5 +77,6 @@
                 <p>&copy; 2025 Auction House. All Rights Reserved.</p>
             </div>
         </footer>
+        <script type="module" src="js/pages/index.js"></script>
     </body>
 </html>
