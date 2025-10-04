@@ -12,7 +12,7 @@ from ..db import (
 from ..errors import AppError, DBError, OrderDataError
 from ..security import get_auth_user, require_admin
 from ..services.auction import compute_call_market_clearing
-from ..services.wallet import wallet_deposit, wallet_release, wallet_reserve, wallet_spend
+from ..services.wallet import add_money, unlock_money, lock_money, spend_locked
 from ..utils import is_admin, is_trader, serialize, to_decimal
 
 auctions_bp = Blueprint('auctions', __name__, url_prefix='/api')
@@ -437,7 +437,7 @@ def place_auction_order(auction_id: int):
                 "price": str(price),
                 "quantity": str(quantity)
             }
-            reserve_result = wallet_reserve(conn, user['id'], reserve_amount, meta=reserve_meta)
+            reserve_result = lock_money(conn, user['id'], reserve_amount, meta=reserve_meta)
             reserve_tx_id = reserve_result['txId']
         cur.close()
         cur = conn.cursor()
@@ -613,17 +613,17 @@ def clear_auction(auction_id: int):
                 cleared_qty_quant = to_decimal(cleared_qty)
                 spent = (price * cleared_qty_quant).quantize(DECIMAL_QUANT)
                 if spent > Decimal('0'):
-                    wallet_spend(conn, row['trader_id'], spent, meta=dict(order_meta, action='settle'))
+                    spend_locked(conn, row['trader_id'], spent, meta=dict(order_meta, action='settle'))
                 remaining = reserved_total - spent
                 if remaining < Decimal('0'):
                     remaining = Decimal('0')
                 if remaining > Decimal('0'):
-                    wallet_release(conn, row['trader_id'], remaining, meta=dict(order_meta, action='release'))
+                    unlock_money(conn, row['trader_id'], remaining, meta=dict(order_meta, action='release'))
             elif row['side'] == 'ask' and cleared_qty > Decimal('0'):
                 cleared_qty_quant = to_decimal(cleared_qty)
                 proceeds = (price * cleared_qty_quant).quantize(DECIMAL_QUANT)
                 if proceeds > Decimal('0'):
-                    wallet_deposit(conn, row['trader_id'], proceeds, meta=dict(order_meta, action='credit'))
+                    add_money(conn, row['trader_id'], proceeds, meta=dict(order_meta, action='credit'))
         conn.commit()
         for row in raw_orders:
             cleared_qty = allocation_map.get(row['id'], Decimal('0'))
