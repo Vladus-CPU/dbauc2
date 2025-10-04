@@ -3,20 +3,20 @@ from typing import Optional, List, Tuple
 from decimal import Decimal
 import datetime
 from .config import DB_CONFIG
-from .errors import DBError
+from .errors import DbFail
 
 
-def db_connection():
+def open_db():
     try:
         connection = connect(**DB_CONFIG)
         if connection.is_connected():
             return connection
-        raise DBError("Database connection failed")
+        raise DbFail("Database connection failed")
     except Error as exception:
-        raise DBError("Database connection failed", details=str(exception))
+        raise DbFail("Database connection failed", details=str(exception))
 
 
-def ensure_users_table(connection):
+def make_users_table(connection):
     cursor = connection.cursor()
     try:
         cursor.execute(
@@ -35,7 +35,7 @@ def ensure_users_table(connection):
     finally:
         cursor.close()
 
-def ensure_user_profiles(connection):
+def make_user_profiles(connection):
     cur = connection.cursor()
     try:
         cur.execute(
@@ -83,7 +83,7 @@ def ensure_user_profiles(connection):
     finally:
         cur.close()
 
-def ensure_listings_table(connection):
+def make_listings_table(connection):
     cursor = connection.cursor()
     try:
         cursor.execute(
@@ -125,7 +125,7 @@ def ensure_listings_table(connection):
     finally:
         cursor.close()
 
-def ensure_orders_table(connection):
+def make_orders_table(connection):
     cursor = connection.cursor()
     try:
         cursor.execute(
@@ -149,7 +149,7 @@ def ensure_orders_table(connection):
     finally:
         cursor.close()
 
-def ensure_trades_table(connection):
+def make_trades_table(connection):
     cursor = connection.cursor()
     try:
         cursor.execute(
@@ -171,7 +171,7 @@ def ensure_trades_table(connection):
     finally:
         cursor.close()
 
-def ensure_auctions_tables(connection):
+def make_auctions_tables(connection):
     cur = connection.cursor()
     try:
         cur.execute(
@@ -254,7 +254,7 @@ def ensure_auctions_tables(connection):
     finally:
         cur.close()
 
-def ensure_resource_transactions(connection):
+def make_resource_transactions(connection):
     cur = connection.cursor()
     try:
         cur.execute(
@@ -275,7 +275,7 @@ def ensure_resource_transactions(connection):
     finally:
         cur.close()
 
-def ensure_resource_documents(connection):
+def make_resource_documents(connection):
     cur = connection.cursor()
     try:
         cur.execute(
@@ -296,7 +296,7 @@ def ensure_resource_documents(connection):
     finally:
         cur.close()
 
-def ensure_wallet_tables(connection):
+def make_wallet_tables(connection):
     cur = connection.cursor()
     try:
         cur.execute(
@@ -331,20 +331,20 @@ def ensure_wallet_tables(connection):
         cur.close()
 
 __all__ = [
-    'db_connection',
-    'ensure_users_table',
-    'ensure_user_profiles',
-    'ensure_listings_table',
-    'ensure_orders_table',
-    'ensure_trades_table',
-    'ensure_auctions_tables',
-    'ensure_resource_transactions',
-    'ensure_resource_documents',
-    'ensure_wallet_tables',
-    'try_add_owner_columns',
+    'open_db',
+    'make_users_table',
+    'make_user_profiles',
+    'make_listings_table',
+    'make_orders_table',
+    'make_trades_table',
+    'make_auctions_tables',
+    'make_resource_transactions',
+    'make_resource_documents',
+    'make_wallet_tables',
+    'try_add_owner_cols',
 ]
 
-def try_add_owner_columns(connection):
+def try_add_owner_cols(connection):
     cur = connection.cursor()
     try:
         try:

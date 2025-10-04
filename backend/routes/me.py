@@ -1,27 +1,27 @@
 import os
 from flask import Blueprint, current_app, jsonify, request, send_from_directory
 from ..db import (
-    db_connection,
-    ensure_auctions_tables,
-    ensure_user_profiles,
-    ensure_users_table,
+    open_db,
+    make_auctions_tables,
+    make_user_profiles,
+    make_users_table,
 )
-from ..errors import AppError
-from ..security import get_auth_user
-from ..utils import clean_string, is_admin, serialize
+from ..errors import AppFail
+from ..security import fetch_user
+from ..utils import trim_or_none, is_admin_user, to_plain
 me_bp = Blueprint('me', __name__, url_prefix='/api/me')
 
 @me_bp.route('/profile', methods=['GET', 'PUT'])
 def me_profile():
-    conn = db_connection()
+    conn = open_db()
     cur = conn.cursor(dictionary=True)
     try:
-        ensure_users_table(conn)
-        ensure_user_profiles(conn)
-        user = get_auth_user(conn)
+        make_users_table(conn)
+        make_user_profiles(conn)
+        user = fetch_user(conn)
         if not user:
-            raise AppError("Unauthorized", statuscode=401)
-        admin = is_admin(user)
+            raise AppFail("Unauthorized", statuscode=401)
+        admin = is_admin_user(user)
         table = 'admins_profile' if admin else 'traders_profile'
         base_columns = ['first_name', 'last_name']
         trader_extra = ['city', 'region', 'country'] if not admin else []
@@ -59,7 +59,7 @@ def me_profile():
         for payload_key, column_name in field_map.items():
             if payload_key in data:
                 updates.append(f"{column_name}=%s")
-                params.append(clean_string(data[payload_key]))
+                params.append(trim_or_none(data[payload_key]))
         if not updates:
             return jsonify({"message": "No changes"})
         cur.close()
@@ -81,14 +81,14 @@ def me_profile():
 
 @me_bp.get('/auctions')
 def me_auctions():
-    conn = db_connection()
+    conn = open_db()
     cur = conn.cursor(dictionary=True)
     try:
-        ensure_users_table(conn)
-        user = get_auth_user(conn)
+        make_users_table(conn)
+        user = fetch_user(conn)
         if not user:
-            raise AppError("Unauthorized", statuscode=401)
-        ensure_auctions_tables(conn)
+            raise AppFail("Unauthorized", statuscode=401)
+        make_auctions_tables(conn)
         cur.execute(
             """
             SELECT p.auction_id,
@@ -107,21 +107,21 @@ def me_auctions():
             """,
             (user['id'],)
         )
-        return jsonify(serialize(cur.fetchall()))
+        return jsonify(to_plain(cur.fetchall()))
     finally:
         cur.close()
         conn.close()
 
 @me_bp.get('/auction-orders')
 def me_auction_orders():
-    conn = db_connection()
+    conn = open_db()
     cur = conn.cursor(dictionary=True)
     try:
-        ensure_users_table(conn)
-        user = get_auth_user(conn)
+        make_users_table(conn)
+        user = fetch_user(conn)
         if not user:
-            raise AppError("Unauthorized", statuscode=401)
-        ensure_auctions_tables(conn)
+            raise AppFail("Unauthorized", statuscode=401)
+        make_auctions_tables(conn)
         cur.execute(
             """
             SELECT o.id, o.auction_id, o.side, o.price, o.quantity, o.status,
@@ -134,19 +134,19 @@ def me_auction_orders():
             """,
             (user['id'],)
         )
-        return jsonify(serialize(cur.fetchall()))
+        return jsonify(to_plain(cur.fetchall()))
     finally:
         cur.close()
         conn.close()
 
 @me_bp.get('/documents')
 def me_documents():
-    conn = db_connection()
+    conn = open_db()
     try:
-        ensure_users_table(conn)
-        user = get_auth_user(conn)
+        make_users_table(conn)
+        user = fetch_user(conn)
         if not user:
-            raise AppError("Unauthorized", statuscode=401)
+            raise AppFail("Unauthorized", statuscode=401)
     finally:
         conn.close()
     base_root = current_app.config['GENERATED_DOCS_ROOT']
@@ -171,18 +171,18 @@ def me_documents():
 
 @me_bp.get('/documents/<int:auction_id>/<path:filename>')
 def me_document_download(auction_id: int, filename: str):
-    conn = db_connection()
+    conn = open_db()
     try:
-        ensure_users_table(conn)
-        user = get_auth_user(conn)
+        make_users_table(conn)
+        user = fetch_user(conn)
         if not user:
-            raise AppError("Unauthorized", statuscode=401)
+            raise AppFail("Unauthorized", statuscode=401)
     finally:
         conn.close()
 
     if f"trader_{user['id']}_" not in filename or '..' in filename or filename.startswith('/') or filename.startswith('\\'):
-        raise AppError("Invalid filename", statuscode=400)
+        raise AppFail("Invalid filename", statuscode=400)
     base_dir = os.path.join(current_app.config['GENERATED_DOCS_ROOT'], f'auction_{auction_id}')
     if not os.path.isdir(base_dir):
-        raise AppError("Not found", statuscode=404)
+        raise AppFail("Not found", statuscode=404)
     return send_from_directory(base_dir, filename, as_attachment=True)
