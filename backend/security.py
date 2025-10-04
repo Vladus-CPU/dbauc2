@@ -3,15 +3,15 @@ import os
 from functools import wraps
 import jwt
 from flask import request, g
-from .errors import AppError
-from .db import db_connection, ensure_users_table
+from .errors import AppFail
+from .db import open_db, make_users_table
 
 JWT_SECRET = os.environ.get('JWT_SECRET', 'dev_secret_change_me')
 JWT_ALGO = 'HS256'
 JWT_TTL_MIN = int(os.environ.get('JWT_TTL_MIN', '60'))
 
 
-def create_token(user):
+def make_token(user):
     now = datetime.datetime.now(datetime.timezone.utc)
     exp = now + datetime.timedelta(minutes=JWT_TTL_MIN)
     payload = {
@@ -24,21 +24,21 @@ def create_token(user):
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
 
 
-def decode_token(token):
+def read_token(token):
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
     except Exception as e:
-        raise AppError("Invalid or expired token", statuscode=401, details=str(e))
+        raise AppFail("Invalid or expired token", statuscode=401, details=str(e))
 
 
-def get_auth_user(connection):
+def fetch_user(connection):
     auth = request.headers.get('Authorization', '')
     if not auth.startswith('Bearer '):
         return None
     token = auth.split(' ', 1)[1].strip()
     try:
-        data = decode_token(token)
-    except AppError:
+        data = read_token(token)
+    except AppFail:
         return None
     user_id = data.get('sub')
     try:
@@ -55,34 +55,33 @@ def get_auth_user(connection):
         cur.close()
 
 
-def require_auth(f):
+def need_login(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        conn = db_connection()
+        conn = open_db()
         try:
-            ensure_users_table(conn)
-            user = get_auth_user(conn)
+            make_users_table(conn)
+            user = fetch_user(conn)
             if not user:
-                raise AppError("Unauthorized", statuscode=401)
+                raise AppFail("Unauthorized", statuscode=401)
             return f(*args, **kwargs)
         finally:
             conn.close()
     return wrapper
 
 
-def require_admin(f):
+def need_admin(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        conn = db_connection()
+        conn = open_db()
         try:
-            ensure_users_table(conn)
-            user = get_auth_user(conn)
+            make_users_table(conn)
+            user = fetch_user(conn)
             if not user or int(user.get('is_admin', 0)) != 1:
-                raise AppError("Forbidden", statuscode=403)
+                raise AppFail("Forbidden", statuscode=403)
             return f(*args, **kwargs)
         finally:
             conn.close()
     return wrapper
 
-
-__all__ = ['create_token', 'decode_token', 'get_auth_user', 'require_auth', 'require_admin', 'JWT_SECRET', 'JWT_ALGO', 'JWT_TTL_MIN']
+__all__ = ['make_token', 'read_token', 'fetch_user', 'need_login', 'need_admin', 'JWT_SECRET', 'JWT_ALGO', 'JWT_TTL_MIN']

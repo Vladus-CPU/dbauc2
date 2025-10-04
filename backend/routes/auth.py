@@ -1,15 +1,15 @@
 from flask import Blueprint, jsonify, request
 from passlib.hash import bcrypt
-from ..db import db_connection, ensure_users_table, ensure_user_profiles
-from ..errors import AppError, DBError
-from ..security import create_token, get_auth_user
+from ..db import open_db, make_users_table, make_user_profiles
+from ..errors import AppFail, DbFail
+from ..security import make_token, fetch_user
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 @auth_bp.post('/register')
 def register():
-    conn = db_connection()
-    ensure_users_table(conn)
-    ensure_user_profiles(conn)
+    conn = open_db()
+    make_users_table(conn)
+    make_user_profiles(conn)
     data = request.get_json(silent=True) or {}
     username = (data.get('username') or '').strip()
     password = data.get('password') or ''
@@ -20,9 +20,9 @@ def register():
     region = (data.get('region') or '').strip() or None
     country = (data.get('country') or '').strip() or None
     if not username or not password:
-        raise AppError("Username and password required", statuscode=400)
+        raise AppFail("Username and password required", statuscode=400)
     if not first_name or not last_name:
-        raise AppError("Profile fields required: firstName, lastName", statuscode=400)
+        raise AppFail("Profile fields required: firstName, lastName", statuscode=400)
     cur = conn.cursor(dictionary=True)
     try:
         cur.execute("SELECT id FROM users WHERE username=%s", (username,))
@@ -52,27 +52,27 @@ def register():
             conn.rollback()
         except Exception:
             pass
-        raise DBError("Error registering user", details=str(e))
+        raise DbFail("Error registering user", details=str(e))
     finally:
         cur.close()
         conn.close()
 
 @auth_bp.post('/login')
 def login():
-    conn = db_connection()
-    ensure_users_table(conn)
+    conn = open_db()
+    make_users_table(conn)
     data = request.get_json(silent=True) or {}
     username = (data.get('username') or '').strip()
     password = data.get('password') or ''
     if not username or not password:
-        raise AppError("Username and password required", statuscode=400)
+        raise AppFail("Username and password required", statuscode=400)
     cur = conn.cursor(dictionary=True)
     try:
         cur.execute("SELECT id, username, email, password_hash, is_admin, created_at FROM users WHERE username=%s", (username,))
         user = cur.fetchone()
         if not user or not bcrypt.verify(password, user['password_hash']):
             return jsonify({"error": "Invalid credentials"}), 401
-        token = create_token(user)
+        token = make_token(user)
         return jsonify({
             "token": token,
             "user": {
@@ -89,10 +89,10 @@ def login():
 
 @auth_bp.get('/me')
 def me():
-    conn = db_connection()
+    conn = open_db()
     try:
-        ensure_users_table(conn)
-        user = get_auth_user(conn)
+        make_users_table(conn)
+        user = fetch_user(conn)
         if not user:
             return jsonify({"authenticated": False}), 200
         return jsonify({"authenticated": True, "user": user})

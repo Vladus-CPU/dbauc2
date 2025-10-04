@@ -1,13 +1,13 @@
 import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List
-from .errors import AppError
+from .errors import AppFail
 
-def serialize(data: Any) -> Any:
+def to_plain(data: Any) -> Any:
     if isinstance(data, list):
-        return [serialize(item) for item in data]
+        return [to_plain(item) for item in data]
     if isinstance(data, dict):
-        return {key: serialize(value) for key, value in data.items()}
+        return {key: to_plain(value) for key, value in data.items()}
     if isinstance(data, Decimal):
         try:
             return float(data)
@@ -20,18 +20,18 @@ def serialize(data: Any) -> Any:
             return str(data)
     return data
 
-def to_decimal(value: Any) -> Decimal:
+def to_dec(value: Any) -> Decimal:
     try:
         if isinstance(value, Decimal):
             return value
         return Decimal(str(value))
     except (InvalidOperation, TypeError, ValueError):
-        raise AppError("Invalid numeric value", statuscode=400)
+        raise AppFail("Invalid numeric value", statuscode=400)
 
-def now_utc() -> datetime.datetime:
+def utc_now() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc)
 
-def clean_string(value: Any) -> str | None:
+def trim_or_none(value: Any) -> str | None:
     if value is None:
         return None
     if isinstance(value, str):
@@ -39,17 +39,17 @@ def clean_string(value: Any) -> str | None:
         return value or None
     return str(value).strip() or None
 
-def is_admin(user: Dict[str, Any] | None) -> bool:
+def is_admin_user(user: Dict[str, Any] | None) -> bool:
     return bool(user) and int(user.get('is_admin', 0)) == 1
 
-def is_trader(user: Dict[str, Any] | None) -> bool:
-    return bool(user) and not is_admin(user)
+def is_trader_user(user: Dict[str, Any] | None) -> bool:
+    return bool(user) and not is_admin_user(user)
 
 __all__ = [
-    'serialize',
-    'to_decimal',
-    'now_utc',
-    'clean_string',
-    'is_admin',
-    'is_trader',
+    'to_plain',
+    'to_dec',
+    'utc_now',
+    'trim_or_none',
+    'is_admin_user',
+    'is_trader_user',
 ]
