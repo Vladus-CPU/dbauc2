@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="uk">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Auction Order Book</title>
+    <link rel="stylesheet" href="css/backgroundstyle.css" />
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/auction-detail.css" />
+  </head>
+  <body class="market-theme">
+    <header class="site-header market-header">
+      <div class="logo">
+        <div class="title-wrap">
+          <h1 class="site-title">Auction House</h1>
+          <span class="site-description">Подвійний аукціон — книга заявок</span>
+        </div>
+      </div>
+      <nav>
+        <a href="index.html" class="nav-link">Home</a>
+        <a href="listing.html" class="nav-link nav-link--internal" data-role-required="admin">
+          <span>Inventory</span>
+          <span class="badge badge--outline">INTERNAL</span>
+        </a>
+        <a href="auctions.html" class="nav-link">Auctions</a>
+        <a href="account.html" class="nav-link">Profile</a>
+        <a href="admin.html" class="nav-link" data-role-required="admin">Admin</a>
+      </nav>
+    </header>
+    <main class="market-container">
+      <section id="market-summary" class="market-summary card">
+        <div class="market-summary__image" id="market-thumbnail" aria-hidden="true">
+          <span>🧺</span>
+        </div>
+        <div class="market-summary__info">
+          <div class="market-summary__head">
+            <h2 id="market-title">Завантаження…</h2>
+            <span id="market-status" class="pill muted"></span>
+          </div>
+          <div class="market-summary__meta" id="market-meta"></div>
+          <div class="market-summary__actions" id="market-actions"></div>
+        </div>
+      </section>
+
+      <section class="market-grid">
+        <article class="card market-panel">
+          <header class="market-panel__header">
+            <h3>Order book</h3>
+            <button class="btn btn-ghost" id="refresh-book">Оновити</button>
+          </header>
+          <div class="market-book" id="market-book">
+            <div class="market-book__block">
+              <h4>Buy orders</h4>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Ціна</th>
+                    <th>Кількість</th>
+                    <th>Ордерів</th>
+                    <th>Кумулятивно</th>
+                  </tr>
+                </thead>
+                <tbody id="book-bids"></tbody>
+              </table>
+            </div>
+            <div class="market-book__block">
+              <h4>Sell orders</h4>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Ціна</th>
+                    <th>Кількість</th>
+                    <th>Ордерів</th>
+                    <th>Кумулятивно</th>
+                  </tr>
+                </thead>
+                <tbody id="book-asks"></tbody>
+              </table>
+            </div>
+          </div>
+        </article>
+
+        <aside class="card market-panel market-panel--secondary">
+          <header class="market-panel__header">
+            <h3>Статистика</h3>
+          </header>
+          <dl class="market-metrics" id="market-metrics"></dl>
+          <div class="market-forms" id="market-forms"></div>
+        </aside>
+
+        <article class="card market-panel market-panel--wide">
+          <header class="market-panel__header">
+            <h3>Останні дії</h3>
+          </header>
+          <div class="market-activity">
+            <div>
+              <h4>Нові заявки</h4>
+              <ul id="recent-orders" class="market-activity__list"></ul>
+            </div>
+            <div>
+              <h4>Кліринг</h4>
+              <div id="clearing-chart" class="market-chart" aria-hidden="true"></div>
+              <ul id="recent-clearing" class="market-activity__list"></ul>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+    <footer class="site-footer-main">
+      <div class="footer-content">
+        <p>&copy; 2025 Auction House. All rights reserved.</p>
+      </div>
+    </footer>
+    <script type="module" src="js/pages/auction-detail.js"></script>
+  </body>
+</html>

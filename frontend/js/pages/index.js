@@ -1,7 +1,9 @@
 import { getListings } from '../api.js';
 import { createListingCard } from '../ui/listingCard.js';
+import { initAccessControl } from '../ui/session.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
+    await initAccessControl();
     const container = document.getElementById('featured-listings');
     if (!container) return;
     container.innerHTML = '';

@@ -4,7 +4,6 @@
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>My Account</title>
-    <link rel="stylesheet" href="css/backgroundstyle.css"/>
     <link rel="stylesheet" href="css/style.css"/>
   </head>
   <body>
@@ -12,18 +11,22 @@
       <div class="logo">
         <div class="title-wrap">
           <h1 class="site-title">Auction House</h1>
-          <span class="site-description">Account</span>
+          <span class="site-description">Profile</span>
         </div>
       </div>
       <nav>
         <a href="index.html" class="nav-link">Home</a>
-        <a href="listing.html" class="nav-link">Browse Listings</a>
-        <a href="account.html" class="nav-link active">My Account</a>
-        <a href="admin.html" class="nav-link">Admin</a>
+        <a href="listing.html" class="nav-link nav-link--internal" data-role-required="admin">
+          <span>Inventory</span>
+          <span class="badge badge--outline">INTERNAL</span>
+        </a>
+        <a href="auctions.html" class="nav-link">Auctions</a>
+        <a href="account.html" class="nav-link active">Profile</a>
+        <a href="admin.html" class="nav-link" data-role-required="admin">Admin</a>
       </nav>
     </header>
     <main class="container">
     </main>
-    <script type="module" src="js/pages/account.js"></script>
+    <script type="module" src="js/pages/account.js?v=2"></script>
   </body>
   </html>

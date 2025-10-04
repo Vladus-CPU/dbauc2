@@ -1,17 +1,39 @@
 :root {
-    --accent: #2bb777;
+    --accent: #4ade80;
+    --accent-strong: #22c55e;
+    --accent-soft: rgba(74, 222, 128, 0.18);
+    --accent-glow: rgba(74, 222, 128, 0.35);
     --space-bg: #030c07;
-    --nebula-1: rgba(43, 183, 119, 0.3);
-    --nebula-2: rgba(40, 150, 90, 0.4);
+    --space-gradient-1: #05130c;
+    --space-gradient-2: #010907;
+    --nebula-1: rgba(61, 180, 120, 0.32);
+    --nebula-2: rgba(35, 112, 74, 0.4);
+    --nebula-3: rgba(36, 181, 130, 0.28);
     --stars: rgba(232, 245, 232, 0.95);
     --grain-opacity: 0.05;
+    --surface-1: rgba(6, 30, 22, 0.78);
+    --surface-2: rgba(8, 40, 28, 0.62);
+    --surface-strong: rgba(12, 46, 33, 0.85);
+    --surface-border: rgba(113, 251, 179, 0.28);
+    --surface-border-soft: rgba(113, 251, 179, 0.12);
+    --surface-border-strong: rgba(113, 251, 179, 0.45);
+    --surface-highlight: rgba(255, 255, 255, 0.04);
+    --text-primary: #ebfff4;
+    --text-muted: #a9d5be;
+    --shadow-soft: 0 18px 42px rgba(0, 0, 0, 0.38);
+    --shadow-hard: 0 22px 58px rgba(0, 0, 0, 0.55);
+    --radius-card: 18px;
+    --radius-large: 28px;
 }
 body {
-    background-color: var(--space-bg);
+    background: radial-gradient(120% 140% at 10% 10%, rgba(76, 175, 128, 0.1), transparent 60%),
+                radial-gradient(95% 90% at 85% 5%, rgba(24, 65, 50, 0.22), transparent 55%),
+                linear-gradient(160deg, var(--space-gradient-1) 0%, var(--space-gradient-2) 100%);
     min-height: 100vh;
     position: relative;
     overflow-x: hidden;
     color-scheme: dark;
+    color: var(--text-primary);
 }
 
 body::before {
@@ -42,16 +64,16 @@ body::after {
     position: fixed;
     inset: -20vmin;
     background: 
-        radial-gradient(ellipse 50% 80% at 15% 20%, var(--nebula-1) 0%, transparent 50%),
-        radial-gradient(ellipse 60% 70% at 85% 40%, var(--nebula-2) 0%, transparent 60%),
-        radial-gradient(ellipse 70% 50% at 40% 85%, var(--nebula-1) 0%, transparent 55%),
-        radial-gradient(ellipse at 20% 80%, rgba(46, 125, 50, 0.06) 0%, transparent 50%),
-        radial-gradient(ellipse at 80% 20%, rgba(76, 175, 80, 0.04) 0%, transparent 50%);
-        background-repeat: no-repeat;
-        background-size: 150% 100%, 80% 120%, 110% 90%;
-        animation: nebulaflow 30s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-        pointer-events: none;
-        z-index: -2;
+        radial-gradient(ellipse 50% 80% at 15% 20%, var(--nebula-1) 0%, transparent 52%),
+        radial-gradient(ellipse 60% 70% at 85% 30%, var(--nebula-2) 0%, transparent 60%),
+        radial-gradient(ellipse 65% 55% at 50% 85%, var(--nebula-3) 0%, transparent 58%),
+        radial-gradient(ellipse at 20% 80%, rgba(46, 125, 50, 0.12) 0%, transparent 54%),
+        radial-gradient(ellipse at 80% 20%, rgba(52, 211, 153, 0.08) 0%, transparent 50%);
+    background-repeat: no-repeat;
+    background-size: 140% 100%, 100% 120%, 110% 90%;
+    animation: nebulaflow 30s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    pointer-events: none;
+    z-index: -2;
 }
 
 @keyframes nebulaflow {
@@ -66,9 +88,9 @@ body::after {
 }
 
 ::selection {
-    background: rgba(46, 125, 50, 0.3);
-    color: #e8f5e8;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    background: rgba(74, 222, 128, 0.35);
+    color: #032012;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
 @media (prefers-reduced-motion: reduce) {
