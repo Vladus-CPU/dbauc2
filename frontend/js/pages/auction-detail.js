@@ -28,6 +28,18 @@ if (!auctionId) {
 }
 
 let isLoading = false;
+// Global refresh sequencing & throttling
+let __refreshSeq = 0;           // incremented for every logical refresh cycle
+let __lastHistoryAt = 0;        // last successful history fetch (ms)
+let __lastDistributionAt = 0;   // last successful distribution fetch (ms)
+const HISTORY_INTERVAL = 5000;  // ms
+const DIST_INTERVAL = 5000;     // ms
+const FULL_REFRESH_INTERVAL = 15000; // ms
+let __refreshTimer = null;
+let __pendingHistory = null;
+let __pendingDistribution = null;
+// Track active tab id
+let __activeTab = 'tab-book';
 
 function formatNumber(value, options = {}) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
@@ -252,17 +264,23 @@ function renderMetrics(book) {
 }
 
 // --------- History (price & depth) ---------
-let lastHistoryAt = 0;
-async function fetchHistory() {
+async function fetchHistory(force=false, seqExpected) {
   if (!auctionId) return null;
   const now = Date.now();
-  if (now - lastHistoryAt < 5000) return null; // throttle 5s
-  lastHistoryAt = now;
-  try {
-    const r = await fetch(`/api/auctions/${auctionId}/history`);
-    if (!r.ok) return null;
-    return await r.json();
-  } catch { return null; }
+  if (!force && (now - __lastHistoryAt < HISTORY_INTERVAL)) return null;
+  // Cancel previous (not via AbortController to keep simple) by overwriting promise ref
+  const p = (async () => {
+    try {
+      const r = await fetch(`/api/auctions/${auctionId}/history`);
+      if (!r.ok) return null;
+      const data = await r.json();
+      if (seqExpected && seqExpected < __refreshSeq) return null; // outdated
+      __lastHistoryAt = Date.now();
+      return data;
+    } catch { return null; }
+  })();
+  __pendingHistory = p;
+  return p;
 }
 
 function buildLine(pts, {w=340,h=90,stroke='#66c0f4'}={}) {
@@ -297,10 +315,10 @@ function buildDepth(curve, {w=340,h=110,midPrice=null}={}) {
   </svg>`;
 }
 
-async function updateHistoryCharts() {
+async function updateHistoryCharts(force=false, seqExpected) {
   if (!historyChartsEl) return;
-  const data = await fetchHistory();
-  if (!data) return;
+  const data = await fetchHistory(force, seqExpected);
+  if (!data) return; // throttled or failed
   const prices = (data.clearedSeries||[]).filter(p=>typeof p.price==='number');
   const lastPrice = prices.length? prices[prices.length-1].price : null;
   const firstPrice = prices.length? prices[0].price : null;
@@ -332,12 +350,16 @@ async function updateHistoryCharts() {
 }
 
 // --------- Price distribution (Steam-like depth bars) ---------
-async function updatePriceDistribution() {
+async function updatePriceDistribution(force=false, seqExpected) {
   if (!priceDistEl) return;
+  const now = Date.now();
+  if (!force && (now - __lastDistributionAt < DIST_INTERVAL)) return; // throttle
   try {
     const res = await fetch(`/api/auctions/${auctionId}/distribution`);
     if (!res.ok) return;
     const dist = await res.json();
+    if (seqExpected && seqExpected < __refreshSeq) return; // outdated response
+    __lastDistributionAt = Date.now();
     const { bids=[], asks=[], mid } = dist;
     const maxQty = Math.max(...bids.map(b=>b.qty), ...asks.map(a=>a.qty), 1);
     const row = (side, o) => {
@@ -549,15 +571,17 @@ function renderForms(book, me, participation) {
   formsEl.append(orderForm);
 }
 
-async function load() {
+async function load(seq) {
   if (isLoading) return;
   isLoading = true;
+  const currentSeq = seq || ++__refreshSeq;
   summaryEl.classList.add('is-loading');
   try {
     const [me, book] = await Promise.all([
       getMe().catch(() => ({ authenticated: false })),
       getAuctionBook(auctionId),
     ]);
+    if (currentSeq < __refreshSeq) return; // outdated; skip apply
     let participation = null;
     if (me?.authenticated && !me.user?.is_admin) {
       participation = await myParticipationStatus(auctionId).catch(() => null);
@@ -568,47 +592,54 @@ async function load() {
     renderOrdersList(book);
     renderClearing(book);
     renderForms(book, me, participation);
-    try {
-      if (book?.auction?.status && book.auction.status !== 'collecting') {
-        if (window.__auctionRefreshTimer) {
-          clearInterval(window.__auctionRefreshTimer);
-          window.__auctionRefreshTimer = null;
-        }
-      }
-    } catch {}
+    window.__lastBook = book;
+    // Auto-stop refresh if auction not collecting
+    if (book?.auction?.status && book.auction.status !== 'collecting') {
+      if (__refreshTimer) { clearInterval(__refreshTimer); __refreshTimer = null; }
+    }
   } catch (error) {
-  summaryEl.innerHTML = `<p class="error">${localizeErrorMessage(error?.message || 'Не вдалося завантажити аукціон')}</p>`;
+    if (currentSeq >= __refreshSeq) {
+      summaryEl.innerHTML = `<p class="error">${localizeErrorMessage(error?.message || 'Не вдалося завантажити аукціон')}</p>`;
+    }
     console.error(error);
   } finally {
-    summaryEl.classList.remove('is-loading');
+    if (currentSeq >= __refreshSeq) summaryEl.classList.remove('is-loading');
     isLoading = false;
+  }
+  return currentSeq;
+}
+
+// Unified refresh orchestrator
+async function refreshAll({forceHistory=false, forceDistribution=false}={}) {
+  const seq = ++__refreshSeq;
+  // Always refresh book first (may update metrics used by others)
+  await load(seq);
+  // Only run heavier tasks if relevant tab visible or forced
+  if (__activeTab === 'tab-distribution' || forceHistory) {
+    updateHistoryCharts(forceHistory, seq);
+    updatePriceDistribution(forceDistribution || forceHistory, seq);
+  } else if (__activeTab === 'tab-book') {
+    // still update history occasionally (background) without force
+    updateHistoryCharts(false, seq);
   }
 }
 
-refreshBtn.addEventListener('click', () => {
-  load().then(() => showToast('Книга заявок оновлена', 'info'));
-});
+refreshBtn.addEventListener('click', () => { refreshAll({forceHistory:true, forceDistribution:true}).then(()=> showToast('Оновлено', 'info')); });
 
 document.addEventListener('DOMContentLoaded', async () => {
   await initAccessControl();
-  await load();
-  updateHistoryCharts();
-  updatePriceDistribution();
-  if (!window.__auctionRefreshTimer) {
-    window.__auctionRefreshTimer = setInterval(() => {
+  await refreshAll({forceHistory:true, forceDistribution:true});
+  if (!__refreshTimer) {
+    __refreshTimer = setInterval(() => {
       if (document.hidden) return;
       if (isLoading) return;
-      load();
-      updateHistoryCharts();
-      updatePriceDistribution();
-    }, 15000);
+      refreshAll();
+    }, FULL_REFRESH_INTERVAL);
   }
-  // kick initial charts
-  updateHistoryCharts();
   window.addEventListener('beforeunload', () => {
-    if (window.__auctionRefreshTimer) {
-      clearInterval(window.__auctionRefreshTimer);
-      window.__auctionRefreshTimer = null;
+    if (__refreshTimer) {
+      clearInterval(__refreshTimer);
+      __refreshTimer = null;
     }
   });
 
@@ -624,10 +655,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       const id = btn.getAttribute('data-tab-target');
       const panel = document.getElementById(id);
       if (panel) panel.classList.add('is-active');
-      // Trigger refresh for distribution/history when switching to that tab
+      __activeTab = id;
       if (id === 'tab-distribution') {
-        updateHistoryCharts();
-        updatePriceDistribution();
+        refreshAll({forceHistory:true, forceDistribution:true});
       }
     });
   });
