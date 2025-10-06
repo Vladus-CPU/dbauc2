@@ -331,3 +331,13 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Price distribution (Steam-like) */
+.dist-col { display: flex; flex-direction: column; gap:2px; }
+.dist-row { position: relative; display:flex; gap:6px; font-size:0.7rem; line-height:1.2; padding:2px 4px; border-radius:4px; overflow:hidden; font-variant-numeric: tabular-nums; }
+.dist-row::before { content:''; position:absolute; inset:0; width:var(--w,0%); background:linear-gradient(90deg,rgba(110,160,255,.18),rgba(110,160,255,0)); pointer-events:none; }
+.dist-row.dist-bid::before { background:linear-gradient(90deg,rgba(60,200,130,.22),rgba(60,200,130,0)); }
+.dist-row.dist-ask::before { background:linear-gradient(90deg,rgba(255,120,120,.22),rgba(255,120,120,0)); }
+.dist-row .p { flex:0 0 70px; }
+.dist-row .q { flex:1; text-align:right; }
+.dist-row .c { flex:0 0 28px; text-align:right; opacity:.7; }

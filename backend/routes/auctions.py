@@ -10,6 +10,7 @@ from ..db import (
     ensure_listings_table,
     ensure_users_table,
     ensure_user_profiles,
+    ensure_wallet_tables,
 )
 from ..errors import AppError, DBError, OrderDataError
 from ..security import get_auth_user, require_admin
