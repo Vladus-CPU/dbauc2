@@ -178,6 +178,7 @@
 }
 .market-book__block td.num { white-space:nowrap; font-variant-numeric:tabular-nums; }
 .market-book__block td.depth-cell { white-space:nowrap; }
+.market-book__block td.lvl-share { color:var(--market-muted); font-size:0.7rem; }
 
 .market-book__block td.depth-cell {
     position: relative;
