@@ -66,7 +66,7 @@ async function renderAuth(container) {
 	},
 		el('div', { className: 'auth-form__header' },
 			el('h3', { className: 'auth-form__title' }, 'Увійти'),
-			el('p', { className: 'auth-form__subtitle', style: 'text-align:center, padding: auto; margin: auto;' }, 'Отримайте доступ до панелі керування акаунтами та аукціонами.')
+			el('p', { className: 'auth-form__subtitle', style: 'text-align:center; margin: 0 auto;' }, 'Отримайте доступ до панелі керування акаунтами та аукціонами.')
 		),
 		el('div', { className: 'form-row' },
 			el('label', { className: 'form__label', htmlFor: 'login_username' }, 'Ім\'я користувача'),
@@ -779,14 +779,26 @@ async function renderDashboard(container, session) {
 					const controls = el('div', { className: 'stack-card__actions' });
 					const accSel = el('select', { className: 'field' }, el('option', { value: '' }, 'Оберіть рахунок (необов\'язково)'));
 					cachedAccounts.forEach(acc => accSel.appendChild(el('option', { value: String(acc.id) }, `#${acc.id} ${acc.account_number}`)));
+					if (!cachedAccounts.length) {
+						controls.appendChild(el('span', { className: 'muted' }, 'Немає збережених рахунків — можна приєднатися без них або додати у вкладці «Акаунти».'));
+					}
 					const joinBtn = el('button', { className: 'btn btn-primary btn-compact', type: 'button' }, 'Приєднатися до аукціону');
 					joinBtn.addEventListener('click', async () => {
+						const prevLabel = joinBtn.textContent;
+						joinBtn.disabled = true;
+						joinBtn.textContent = 'Надсилаємо...';
 						try {
 							const val = accSel.value ? Number(accSel.value) : undefined;
 							await joinAuction(a.id, val);
 							showToast('Заявку подано', 'success');
+							await refresh();
 						} catch (e) {
 							showToast(e?.message || 'Не вдалося приєднатися', 'error');
+						} finally {
+							if (joinBtn.isConnected) {
+								joinBtn.disabled = false;
+								joinBtn.textContent = prevLabel;
+							}
 						}
 					});
 
@@ -805,12 +817,23 @@ async function renderDashboard(container, session) {
 						const price = Number(fd.get('price'));
 						const qty = Number(fd.get('quantity'));
 						if (!(price > 0 && qty > 0)) { showToast('Введіть додатні ціну та кількість', 'error'); return; }
+						const submitBtn = orderForm.querySelector('button[type="submit"]');
+						if (submitBtn) {
+							submitBtn.disabled = true;
+							submitBtn.textContent = 'Відправляємо...';
+						}
 						try {
 							await placeAuctionOrder(a.id, { type: String(fd.get('type')), price, quantity: qty });
 							showToast('Ордер розміщено', 'success');
 							orderForm.reset();
+							await refresh();
 						} catch (e) {
 							showToast(e?.message || 'Помилка ордера', 'error');
+						} finally {
+							if (submitBtn) {
+								submitBtn.disabled = false;
+								submitBtn.textContent = 'Подати закритий ордер';
+							}
 						}
 					});
 
