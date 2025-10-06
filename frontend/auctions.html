@@ -94,6 +94,12 @@
           <h3 class="section-heading__title">Поточний стан ринку</h3>
         </div>
         <div class="metrics-grid" id="auction-metrics"></div>
+        <div class="filter-pills" id="auction-quick-filters" aria-label="Швидкі фільтри">
+          <button type="button" data-filter-status="all" class="pill-btn is-active">Усі</button>
+          <button type="button" data-filter-status="collecting" class="pill-btn">Збір</button>
+          <button type="button" data-filter-status="cleared" class="pill-btn">Відкліринено</button>
+          <button type="button" data-filter-status="closed" class="pill-btn">Закрито</button>
+        </div>
       </section>
 
       <section class="dashboard-card" id="collecting-card" aria-labelledby="collecting-heading">
@@ -112,6 +118,9 @@
           <p class="section-heading__meta">Результати завершених вікон з підсумками цін та обсягів. <button type="button" id="history-expand-btn" class="btn btn-ghost btn-compact" aria-expanded="false">Показати більше</button></p>
         </div>
         <div class="stack-grid" id="cleared-list" aria-live="polite"></div>
+        <div class="history-load-more" id="history-load-more-wrap" hidden>
+          <button type="button" id="history-load-more" class="btn btn-ghost btn-compact">Показати ще 30</button>
+        </div>
       </section>
 
       <div class="visually-hidden" aria-live="polite" id="auctions-announcer"></div>

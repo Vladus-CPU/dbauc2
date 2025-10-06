@@ -326,6 +326,11 @@ function renderLists() {
   } else {
     history.slice(0, state.historySlice).forEach(a => clearedList.appendChild(createHistoryCard(a)));
   }
+  // Load more visibility
+  const loadWrap = document.getElementById('history-load-more-wrap');
+  if (loadWrap) {
+    loadWrap.hidden = history.length <= state.historySlice;
+  }
   announce(`Оновлено: активні ${collecting.length}, історія ${history.length}`);
   updateLastUpdated();
 }
@@ -397,6 +402,8 @@ function attachUI(){
   const expandBtn = document.getElementById('history-expand-btn');
   const sortSel = document.getElementById('auction-filter-sort');
   const compactToggle = document.getElementById('auction-compact-toggle');
+  const quickPills = document.getElementById('auction-quick-filters');
+  const loadMoreBtn = document.getElementById('history-load-more');
   if (search){
     let t; search.addEventListener('input', (e)=>{ clearTimeout(t); t=setTimeout(()=>{ state.filters.search=e.target.value.trim(); applyFilters(); renderLists(); },300);});
   }
@@ -406,6 +413,23 @@ function attachUI(){
   if (refreshBtn){ refreshBtn.addEventListener('click', ()=> hardRefresh()); }
   if (auto){ auto.addEventListener('change', ()=> { scheduleAuto(); }); }
   if (expandBtn){ expandBtn.addEventListener('click', ()=> { const expanded = expandBtn.getAttribute('aria-expanded')==='true'; expandBtn.setAttribute('aria-expanded', String(!expanded)); state.historySlice = expanded?6:30; renderLists(); }); }
+  if (quickPills){
+    quickPills.addEventListener('click', (e)=>{
+      const btn = e.target.closest('button[data-filter-status]');
+      if(!btn) return; 
+      const status = btn.getAttribute('data-filter-status');
+      state.filters.status = status;
+      // Update pill active states
+      [...quickPills.querySelectorAll('button')].forEach(b=>b.classList.toggle('is-active', b===btn));
+      applyFilters(); renderLists();
+      // Sync select if exists
+      const statusSelDom = document.getElementById('auction-filter-status');
+      if (statusSelDom) statusSelDom.value = status;
+    });
+  }
+  if (loadMoreBtn){
+    loadMoreBtn.addEventListener('click', ()=> { state.historySlice += 30; renderLists(); });
+  }
 }
 
 function skeletonBlock(n){

@@ -160,3 +160,12 @@
 
 /* Visually hidden utility (if not already elsewhere) */
 .visually-hidden {position:absolute !important;width:1px !important;height:1px !important;padding:0 !important;margin:-1px !important;overflow:hidden !important;clip:rect(0 0 0 0) !important;white-space:nowrap !important;border:0 !important;}
+
+/* Quick filter pills */
+.filter-pills {display:flex;flex-wrap:wrap;gap:6px;margin-top:18px;}
+.pill-btn {background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:inherit;padding:6px 12px;font-size:0.7rem;letter-spacing:.05em;text-transform:uppercase;border-radius:20px;cursor:pointer;transition:background .2s,border-color .2s;}
+.pill-btn:hover {background:rgba(255,255,255,0.12);} 
+.pill-btn.is-active {background:var(--accent, #2ecc71);border-color:var(--accent, #2ecc71);color:#062412;font-weight:600;}
+
+/* Load more history */
+.history-load-more {display:flex;justify-content:center;margin-top:12px;}
