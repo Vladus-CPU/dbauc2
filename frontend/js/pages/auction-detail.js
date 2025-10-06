@@ -192,16 +192,36 @@ function renderMetrics(book) {
     {k:'mid', label:'Mid ціна', value:fmt(m.midPrice), spark:sparkBar(h.midPrice,{stroke:'#66c0f4'})},
     {k:'depthImb', label:'Дисбаланс', value:fmt(typeof m.depthImbalance==='number'?m.depthImbalance*100:NaN,{pct:true}), spark:sparkBar(h.depthImbalancePct,{stroke:'#ff9393'}), cls: (m.depthImbalance>0?'positive':'negative')},
     {k:'lastClr', label:'Clearing ціна', value:fmt(m.lastClearingPrice), spark:sparkBar(h.lastClearingPrice,{stroke:'#cfa8ff'})},
-    {k:'totBid', label:'Обсяг bid', value:fmt(m.totalBidQuantity)},
-    {k:'totAsk', label:'Обсяг ask', value:fmt(m.totalAskQuantity)},
     {k:'ordersBid', label:'Ордерів bid', value:fmt(m.bidOrderCount)},
     {k:'ordersAsk', label:'Ордерів ask', value:fmt(m.askOrderCount)}
   ];
+  // Create standard tiles (except combined volume handled separately below)
   tiles.forEach(t=>{
     const div = document.createElement('div'); div.className='metric-tile'+(t.cls?(' '+t.cls):'');
     div.innerHTML = `<div class="metric-tile__label">${t.label}</div><div class="metric-tile__value">${t.value}</div>${t.spark?`<div class="metric-tile__spark">${t.spark}</div>`:''}`;
     grid.appendChild(div);
   });
+
+  // Combined Bid/Ask volume progress bar tile
+  const bidVol = (typeof m.totalBidQuantity === 'number' ? m.totalBidQuantity : 0) || 0;
+  const askVol = (typeof m.totalAskQuantity === 'number' ? m.totalAskQuantity : 0) || 0;
+  const totVol = bidVol + askVol;
+  const bidPct = totVol ? (bidVol / totVol) * 100 : 0;
+  const askPct = totVol ? (askVol / totVol) * 100 : 0;
+  const volTile = document.createElement('div');
+  volTile.className = 'metric-tile metric-tile--volumes';
+  volTile.innerHTML = `
+    <div class="metric-tile__label">Обсяг (усього)</div>
+    <div class="metric-tile__value" style="font-size:0.95rem;">${fmt(totVol)}</div>
+    <div class="dual-progress" title="Bid: ${fmt(bidVol)} (${bidPct.toFixed(1)}%) · Ask: ${fmt(askVol)} (${askPct.toFixed(1)}%)">
+      <div class="dual-progress__seg bid" style="width:${bidPct}%;"></div>
+      <div class="dual-progress__seg ask" style="width:${askPct}%;"></div>
+    </div>
+    <div class="dual-progress__legend">
+      <span class="bid">Bid ${fmt(bidVol)} (${bidPct.toFixed(1)}%)</span>
+      <span class="ask">Ask ${fmt(askVol)} (${askPct.toFixed(1)}%)</span>
+    </div>`;
+  grid.appendChild(volTile);
   wrap.appendChild(grid);
   // Toggle & extra metrics
   const toggle = document.createElement('button'); toggle.type='button'; toggle.className='metrics-more-toggle'; toggle.textContent='Додаткові метрики';
