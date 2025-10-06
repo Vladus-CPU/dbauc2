@@ -196,6 +196,13 @@ function renderMetrics(book) {
     {k:'ordersBid', label:'Ордерів bid', value:fmt(m.bidOrderCount)},
     {k:'ordersAsk', label:'Ордерів ask', value:fmt(m.askOrderCount)}
   ];
+  if (typeof m.kValue === 'number') {
+    tiles.push({k:'kVal', label:'k (база)', value:fmt(m.kValue,{})});
+  }
+  if (typeof m.adaptiveK === 'number') {
+    const diffCls = (m.kValue!==undefined && m.adaptiveK!==m.kValue)? 'positive' : '';
+    tiles.push({k:'kAdaptive', label:'k адаптив', value:fmt(m.adaptiveK,{}), cls: diffCls});
+  }
   // Create standard tiles (except combined volume handled separately below)
   tiles.forEach(t=>{
     const div = document.createElement('div'); div.className='metric-tile'+(t.cls?(' '+t.cls):'');
