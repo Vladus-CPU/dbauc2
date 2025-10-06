@@ -1054,6 +1054,20 @@ def cleanup_bots(auction_id: int):
             still_rows = cur.fetchall()
             deletable = [r['id'] for r in still_rows if int(r.get('refcount') or 0) == 0]
             if deletable:
+                # Remove wallet transactions and accounts
+                cur.execute(
+                    f"DELETE FROM wallet_transactions WHERE user_id IN ({','.join(['%s']*len(deletable))})",
+                    tuple(deletable)
+                )
+                cur.execute(
+                    f"DELETE FROM wallet_accounts WHERE user_id IN ({','.join(['%s']*len(deletable))})",
+                    tuple(deletable)
+                )
+                # Remove trader profiles
+                cur.execute(
+                    f"DELETE FROM traders_profile WHERE user_id IN ({','.join(['%s']*len(deletable))})",
+                    tuple(deletable)
+                )
                 cur.execute(
                     f"DELETE FROM users WHERE id IN ({','.join(['%s']*len(deletable))})",
                     tuple(deletable)
@@ -1078,7 +1092,59 @@ def cleanup_bots(auction_id: int):
         try: conn.rollback()
         except Exception: pass
         raise DBError("Error cleaning up bot data", details=str(e))
+
+@auctions_bp.get('/auctions/<int:auction_id>/history')
+def auction_history(auction_id: int):
+    """Return lightweight time series for an auction (mid, best bid/ask, spread) and a current cumulative book snapshot.
+
+    For now this derives history from the most recent open orders + cleared events (no long-term persistence yet).
+    Frontend can poll this and accumulate longer history client side.
+    """
+    conn = db_connection()
+    cur = conn.cursor(dictionary=True)
+    try:
+        ensure_auctions_tables(conn)
+        cur.execute("SELECT id,status FROM auctions WHERE id=%s", (auction_id,))
+        auction_row = cur.fetchone()
+        if not auction_row:
+            raise AppError("Auction not found", statuscode=404)
+        # Recent cleared (price timeline proxy)
+        cur.execute(
+            "SELECT cleared_price, cleared_quantity, created_at FROM auction_orders WHERE auction_id=%s AND status='cleared' AND cleared_quantity IS NOT NULL AND cleared_quantity>0 ORDER BY created_at DESC LIMIT 200",
+            (auction_id,)
+        )
+        cleared = cur.fetchall()
+        cleared_series = [
+            {
+                "t": row['created_at'].isoformat() if row['created_at'] else None,
+                "price": float(to_decimal(row['cleared_price'])) if row.get('cleared_price') is not None else None,
+                "quantity": float(to_decimal(row['cleared_quantity'])) if row.get('cleared_quantity') is not None else None
+            } for row in reversed(cleared)
+        ]
+        # Order book aggregation (current snapshot cumulative depth curve)
+        cur.execute("SELECT side, price, quantity, created_at FROM auction_orders WHERE auction_id=%s AND status='open'", (auction_id,))
+        rows = cur.fetchall()
+        bid_orders = [r for r in rows if r['side']=='bid']
+        ask_orders = [r for r in rows if r['side']=='ask']
+        def _agg(levels):
+            out = []
+            cum = 0.0
+            for lvl in levels:
+                cum += lvl['totalQuantity']
+                out.append({"price": lvl['price'], "depth": lvl['totalQuantity'], "cum": cum})
+            return out
+        bid_levels = _aggregate_levels(sorted(bid_orders, key=lambda o: (o['price'], o['created_at']), reverse=True), reverse=True)
+        ask_levels = _aggregate_levels(sorted(ask_orders, key=lambda o: (o['price'], o['created_at'])), reverse=False)
+        book_snapshot = {"bids": _agg(bid_levels), "asks": _agg(ask_levels)}
+        return jsonify({
+            "auctionId": auction_id,
+            "status": auction_row['status'],
+            "clearedSeries": cleared_series,
+            "bookCurve": book_snapshot
+        })
     finally:
-        try: cur.close()
-        except Exception: pass
+        try:
+            cur.close()
+        except Exception:
+            pass
         conn.close()
