@@ -164,11 +164,17 @@ function renderMetrics(book) {
     ['Остання ціна клірингу', m.lastClearingPrice],
     ['Останній обсяг клірингу', m.lastClearingQuantity],
   ];
+  const formatValue = (value) => {
+    if (value === null || value === undefined) return '—';
+    if (typeof value === 'number') return formatNumber(value);
+    if (typeof value === 'string' && value.trim() === '') return '—';
+    return value;
+  };
   rows.forEach(([label, value]) => {
     const dt = document.createElement('dt');
     dt.textContent = label;
     const dd = document.createElement('dd');
-    dd.textContent = typeof value === 'number' ? formatNumber(value) : value ?? '—';
+    dd.textContent = formatValue(value);
     metricsEl.append(dt, dd);
   });
 }
@@ -379,6 +385,15 @@ async function load() {
     renderOrdersList(book);
     renderClearing(book);
     renderForms(book, me, participation);
+    // Stop auto-refresh if auction closed
+    try {
+      if (book?.auction?.status && book.auction.status !== 'collecting') {
+        if (window.__auctionRefreshTimer) {
+          clearInterval(window.__auctionRefreshTimer);
+          window.__auctionRefreshTimer = null;
+        }
+      }
+    } catch {}
   } catch (error) {
   summaryEl.innerHTML = `<p class="error">${localizeErrorMessage(error?.message || 'Не вдалося завантажити аукціон')}</p>`;
     console.error(error);
@@ -395,4 +410,18 @@ refreshBtn.addEventListener('click', () => {
 document.addEventListener('DOMContentLoaded', async () => {
   await initAccessControl();
   await load();
+  // Lightweight auto-refresh while collecting, every 15s, skip when tab hidden
+  if (!window.__auctionRefreshTimer) {
+    window.__auctionRefreshTimer = setInterval(() => {
+      if (document.hidden) return;
+      if (isLoading) return;
+      load();
+    }, 15000);
+  }
+  window.addEventListener('beforeunload', () => {
+    if (window.__auctionRefreshTimer) {
+      clearInterval(window.__auctionRefreshTimer);
+      window.__auctionRefreshTimer = null;
+    }
+  });
 });
