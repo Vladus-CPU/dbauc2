@@ -1,35 +1,76 @@
 import datetime
 import os
 from decimal import Decimal
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 from flask import Blueprint, current_app, g, jsonify, request, send_from_directory
 from ..db import (
-    open_db,
-    make_auctions_tables,
-    make_listings_table,
-    make_users_table,
+    db_connection,
+    ensure_auctions_tables,
+    ensure_listings_table,
+    ensure_users_table,
 )
-from ..errors import AppFail, DbFail, BadOrderData
-from ..security import fetch_user, need_admin
-from ..services.auction import compute_call_market_clearing, to_decimal
-from ..services.wallet import add_money, unlock_money, lock_money, spend_locked
-from ..utils import is_admin_user, is_trader_user, to_plain, to_dec
-
-import datetime
-import os
-from decimal import Decimal
-from typing import Dict, List
-from flask import Blueprint, current_app, g, jsonify, request, send_from_directory
-from ..db import open_db, make_auctions_tables, make_listings_table, make_users_table
-from ..errors import AppFail, DbFail, BadOrderData
-from ..security import fetch_user, need_admin
+from ..errors import AppError, DBError, OrderDataError
+from ..security import get_auth_user, require_admin
 from ..services.auction import compute_call_market_clearing
-from ..services.wallet import add_money, unlock_money, lock_money, spend_locked
-from ..utils import is_admin_user, is_trader_user, to_plain, to_dec
+from ..services.wallet import wallet_deposit, wallet_release, wallet_reserve, wallet_spend
+from ..utils import is_admin, is_trader, serialize, to_decimal
 
 auctions_bp = Blueprint('auctions', __name__, url_prefix='/api')
 
 DECIMAL_QUANT = Decimal('0.000001')
+
+
+def _normalize_decimal(value: Optional[Decimal]) -> Optional[Decimal]:
+    if value is None:
+        return None
+    if not isinstance(value, Decimal):
+        value = Decimal(str(value))
+    return value.quantize(DECIMAL_QUANT)
+
+
+def _record_clearing_state(
+    cur,
+    auction_id: int,
+    admin_user,
+    *,
+    price: Optional[Decimal],
+    quantity: Optional[Decimal],
+    demand: Optional[Decimal],
+    supply: Optional[Decimal],
+    price_interval: Optional[Tuple[Optional[Decimal], Optional[Decimal]]]
+) -> None:
+    admin_id_value = None
+    if isinstance(admin_user, dict):
+        admin_id_value = admin_user.get('id')
+    low, high = (None, None)
+    if price_interval:
+        low, high = price_interval
+    cur.execute(
+        """
+        UPDATE auctions
+        SET status='cleared',
+            closed_at=%s,
+            admin_id=COALESCE(admin_id,%s),
+            clearing_price=%s,
+            clearing_quantity=%s,
+            clearing_demand=%s,
+            clearing_supply=%s,
+            clearing_price_low=%s,
+            clearing_price_high=%s
+        WHERE id=%s
+        """,
+        (
+            datetime.datetime.utcnow(),
+            admin_id_value,
+            _normalize_decimal(price),
+            _normalize_decimal(quantity),
+            _normalize_decimal(demand),
+            _normalize_decimal(supply),
+            _normalize_decimal(low),
+            _normalize_decimal(high),
+            auction_id
+        )
+    )
 
 
 def _aggregate_levels(orders, reverse=False):
@@ -68,13 +109,12 @@ def _serialize_orders(rows):
         })
     return out
 
-
 @auctions_bp.get('/auctions')
 def list_auctions():
-    conn = open_db()
+    conn = db_connection()
     cur = conn.cursor(dictionary=True)
     try:
-        make_auctions_tables(conn)
+        ensure_auctions_tables(conn)
         status = request.args.get('status')
         auction_type = request.args.get('type')
         where = []
@@ -90,7 +130,7 @@ def list_auctions():
             sql += ' WHERE ' + ' AND '.join(where)
         sql += ' ORDER BY created_at DESC'
         cur.execute(sql, tuple(params))
-        return jsonify(to_plain(cur.fetchall()))
+        return jsonify(serialize(cur.fetchall()))
     finally:
         cur.close()
         conn.close()
@@ -98,10 +138,10 @@ def list_auctions():
 
 @auctions_bp.get('/auctions/<int:auction_id>/book')
 def auction_order_book(auction_id: int):
-    conn = open_db()
+    conn = db_connection()
     cur = conn.cursor(dictionary=True)
     try:
-        make_auctions_tables(conn)
+        ensure_auctions_tables(conn)
         cur.execute(
             "SELECT id, product, type, status, k_value, window_start, window_end, created_at, closed_at "
             "FROM auctions WHERE id=%s",
@@ -109,7 +149,7 @@ def auction_order_book(auction_id: int):
         )
         auction = cur.fetchone()
         if not auction:
-            raise AppFail("Auction not found", statuscode=404)
+            raise AppError("Auction not found", statuscode=404)
 
         cur.execute(
             "SELECT id, trader_id, side, price, quantity, created_at "
@@ -120,8 +160,8 @@ def auction_order_book(auction_id: int):
         bid_orders = []
         ask_orders = []
         for row in open_rows:
-            price = to_dec(row['price'])
-            quantity = to_dec(row['quantity'])
+            price = to_decimal(row['price'])
+            quantity = to_decimal(row['quantity'])
             order = {
                 'id': row['id'],
                 'trader_id': row['trader_id'],
@@ -160,8 +200,8 @@ def auction_order_book(auction_id: int):
             cleared_entries.append({
                 "id": row['id'],
                 "side": row['side'],
-                "price": float(to_dec(row['cleared_price'] or row['price'])),
-                "quantity": float(to_dec(row['cleared_quantity'])),
+                "price": float(to_decimal(row['cleared_price'] or row['price'])),
+                "quantity": float(to_decimal(row['cleared_quantity'])),
                 "createdAt": row['created_at'].isoformat() if row['created_at'] else None
             })
 
@@ -181,8 +221,11 @@ def auction_order_book(auction_id: int):
         recent_ask_orders = sorted(ask_orders, key=lambda o: (o['price'], o['created_at']))[:10]
 
         response = {
-            "auction": to_plain(auction),
-            "book": {"bids": bid_levels, "asks": ask_levels},
+            "auction": serialize(auction),
+            "book": {
+                "bids": bid_levels,
+                "asks": ask_levels
+            },
             "metrics": metrics,
             "recentOrders": {
                 "bids": _serialize_orders(recent_bid_orders),
@@ -195,13 +238,12 @@ def auction_order_book(auction_id: int):
         cur.close()
         conn.close()
 
-
 @auctions_bp.post('/admin/auctions')
-@need_admin
+@require_admin
 def create_auction():
     user = g.get('user')
-    if not user or not is_admin_user(user):
-        raise AppFail("Forbidden", statuscode=403)
+    if not user or not is_admin(user):
+        raise AppError("Forbidden", statuscode=403)
 
     data = request.get_json(silent=True) or {}
     product = (data.get('product') or '').strip()
@@ -216,7 +258,7 @@ def create_auction():
         try:
             listing_id_value = int(raw_listing_id)
         except (TypeError, ValueError):
-            raise BadOrderData("Field 'listingId' must be an integer")
+            raise OrderDataError("Field 'listingId' must be an integer")
 
     def parse_dt(value):
         if not value:
@@ -224,17 +266,17 @@ def create_auction():
         try:
             return datetime.datetime.fromisoformat(str(value).replace('Z', '+00:00'))
         except Exception:
-            raise BadOrderData("Invalid datetime format (use ISO 8601)")
+            raise OrderDataError("Invalid datetime format (use ISO 8601)")
 
     window_start_dt = parse_dt(window_start)
     window_end_dt = parse_dt(window_end)
 
     listing_row = None
-    conn = open_db()
+    conn = db_connection()
     try:
-        make_auctions_tables(conn)
+        ensure_auctions_tables(conn)
         if listing_id_value is not None:
-            make_listings_table(conn)
+            ensure_listings_table(conn)
             listing_cur = conn.cursor(dictionary=True)
             try:
                 listing_cur.execute("SELECT id, title, status FROM listings WHERE id=%s", (listing_id_value,))
@@ -242,20 +284,20 @@ def create_auction():
             finally:
                 listing_cur.close()
             if not listing_row:
-                raise BadOrderData("Listing not found")
+                raise OrderDataError("Listing not found")
             if not product:
                 product = (listing_row.get('title') or '').strip()
 
         if not product:
-            raise BadOrderData("Field 'product' is required")
+            raise OrderDataError("Field 'product' is required")
         if auction_type not in ('open', 'closed'):
-            raise BadOrderData("Field 'type' must be 'open' or 'closed'")
+            raise OrderDataError("Field 'type' must be 'open' or 'closed'")
         try:
-            k_dec = to_dec(k_value)
-        except AppFail:
-            raise BadOrderData("Field 'k' must be a number between 0 and 1")
+            k_dec = to_decimal(k_value)
+        except OrderDataError:
+            raise OrderDataError("Field 'k' must be a number between 0 and 1")
         if k_dec < Decimal('0') or k_dec > Decimal('1'):
-            raise BadOrderData("Field 'k' must be between 0 and 1")
+            raise OrderDataError("Field 'k' must be between 0 and 1")
 
         insert_cur = conn.cursor()
         try:
@@ -280,33 +322,50 @@ def create_auction():
 
         conn.commit()
         return jsonify({"message": "Auction created", "id": auction_id}), 201
-    except AppFail:
+    except AppError:
         raise
     except Exception as exception:
         try:
             conn.rollback()
         except Exception:
             pass
-        raise DbFail("Error creating auction", details=str(exception))
+        raise DBError("Error creating auction", details=str(exception))
     finally:
+        conn.close()
+
+@auctions_bp.patch('/admin/auctions/<int:auction_id>/close')
+@require_admin
+def close_auction(auction_id: int):
+    conn = db_connection()
+    cur = conn.cursor()
+    try:
+        ensure_auctions_tables(conn)
+        cur.execute(
+            "UPDATE auctions SET status='closed', closed_at=%s WHERE id=%s",
+            (datetime.datetime.utcnow(), auction_id)
+        )
+        conn.commit()
+        return jsonify({"message": "Auction closed"})
+    finally:
+        cur.close()
         conn.close()
 
 @auctions_bp.post('/auctions/<int:auction_id>/join')
 def join_auction(auction_id: int):
-    conn = open_db()
+    conn = db_connection()
     cur = conn.cursor(dictionary=True)
     try:
-        make_users_table(conn)
-        make_auctions_tables(conn)
-        user = fetch_user(conn)
-        if not user or not is_trader_user(user):
-            raise AppFail("Unauthorized", statuscode=401)
+        ensure_users_table(conn)
+        ensure_auctions_tables(conn)
+        user = get_auth_user(conn)
+        if not user or not is_trader(user):
+            raise AppError("Unauthorized", statuscode=401)
         cur.execute("SELECT id, type, status FROM auctions WHERE id=%s", (auction_id,))
         auction = cur.fetchone()
         if not auction:
-            raise AppFail("Auction not found", statuscode=404)
+            raise AppError("Auction not found", statuscode=404)
         if auction['status'] != 'collecting':
-            raise AppFail("Auction is not accepting participants", statuscode=400)
+            raise AppError("Auction is not accepting participants", statuscode=400)
         data = request.get_json(silent=True) or {}
         account_id = data.get('accountId')
         account_id_value = None
@@ -314,35 +373,31 @@ def join_auction(auction_id: int):
             try:
                 account_id_value = int(account_id)
             except (TypeError, ValueError):
-                raise BadOrderData("Invalid accountId")
+                raise AppError("Invalid accountId", statuscode=400)
             cur.execute(
                 "SELECT id FROM trader_accounts WHERE id=%s AND trader_id=%s",
                 (account_id_value, user['id'])
             )
             if not cur.fetchone():
-                raise BadOrderData("Invalid accountId for this trader")
-        status_value = 'approved' if auction['type'] == 'open' else 'pending'
+                raise AppError("Invalid accountId for this trader", statuscode=400)
+        status = 'approved' if auction['type'] == 'open' else 'pending'
         cur.close()
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO auction_participants (auction_id, trader_id, account_id, status) VALUES (%s,%s,%s,%s) "
-            "ON DUPLICATE KEY UPDATE account_id=VALUES(account_id), status=VALUES(status)",
-            (auction_id, user['id'], account_id_value, status_value)
+            "INSERT INTO auction_participants (auction_id, trader_id, account_id, status) VALUES (%s,%s,%s,%s)"
+            " ON DUPLICATE KEY UPDATE account_id=VALUES(account_id), status=VALUES(status)",
+            (auction_id, user['id'], account_id_value, status)
         )
         conn.commit()
-        message = "Join request submitted" if status_value == 'pending' else "Joined auction"
-        return jsonify({"message": message, "status": status_value}), 201
-    except AppFail:
-        raise
-    except BadOrderData:
-        raise
+        message = "Join request submitted" if status == 'pending' else "Joined auction"
+        return jsonify({"message": message, "status": status}), 201
     except Exception as exception:
         current_app.logger.exception("Error joining auction %s", auction_id)
         try:
             conn.rollback()
         except Exception:
             pass
-        raise DbFail("Error joining auction", details=str(exception))
+        raise DBError("Error joining auction", details=str(exception))
     finally:
         try:
             cur.close()
@@ -350,76 +405,62 @@ def join_auction(auction_id: int):
             pass
         conn.close()
 
-
 @auctions_bp.get('/admin/auctions/<int:auction_id>/participants')
-@need_admin
+@require_admin
 def list_participants_admin(auction_id: int):
-    conn = open_db()
+    conn = db_connection()
     cur = conn.cursor(dictionary=True)
     try:
-        make_auctions_tables(conn)
+        ensure_auctions_tables(conn)
         cur.execute(
-            "SELECT id, trader_id, account_id, status, joined_at FROM auction_participants WHERE auction_id=%s ORDER BY joined_at DESC",
+            "SELECT * FROM auction_participants WHERE auction_id=%s ORDER BY joined_at DESC",
             (auction_id,)
         )
-        return jsonify(to_plain(cur.fetchall()))
+        return jsonify(serialize(cur.fetchall()))
     finally:
         cur.close()
         conn.close()
 
-
 @auctions_bp.patch('/admin/auctions/<int:auction_id>/participants/<int:participant_id>/approve')
-@need_admin
+@require_admin
 def approve_participant(auction_id: int, participant_id: int):
-    conn = open_db()
+    conn = db_connection()
     cur = conn.cursor()
     try:
-        make_auctions_tables(conn)
+        ensure_auctions_tables(conn)
         cur.execute(
             "UPDATE auction_participants SET status='approved' WHERE id=%s AND auction_id=%s",
             (participant_id, auction_id)
         )
         if cur.rowcount == 0:
-            raise AppFail("Participant not found", statuscode=404)
+            raise AppError("Participant not found", statuscode=404)
         conn.commit()
         return jsonify({"message": "Participant approved"})
-    except AppFail:
-        raise
-    except Exception as exception:
-        try:
-            conn.rollback()
-        except Exception:
-            pass
-        raise DbFail("Error approving participant", details=str(exception))
     finally:
-        try:
-            cur.close()
-        except Exception:
-            pass
+        cur.close()
         conn.close()
-
 
 @auctions_bp.post('/auctions/<int:auction_id>/orders')
 def place_auction_order(auction_id: int):
-    conn = open_db()
+    conn = db_connection()
     cur = conn.cursor(dictionary=True)
     try:
-        make_users_table(conn)
-        make_auctions_tables(conn)
-        user = fetch_user(conn)
-        if not user or not is_trader_user(user):
-            raise AppFail("Unauthorized", statuscode=401)
+        ensure_users_table(conn)
+        ensure_auctions_tables(conn)
+        user = get_auth_user(conn)
+        if not user or not is_trader(user):
+            raise AppError("Unauthorized", statuscode=401)
         cur.execute("SELECT id, type, status, window_start, window_end FROM auctions WHERE id=%s", (auction_id,))
         auction = cur.fetchone()
         if not auction:
-            raise AppFail("Auction not found", statuscode=404)
+            raise AppError("Auction not found", statuscode=404)
         if auction['status'] != 'collecting':
-            raise AppFail("Auction is not collecting orders", statuscode=400)
+            raise AppError("Auction is not collecting orders", statuscode=400)
         now = datetime.datetime.utcnow()
         if auction['window_start'] and now < auction['window_start']:
-            raise AppFail("Auction window has not started", statuscode=400)
+            raise AppError("Auction window has not started", statuscode=400)
         if auction['window_end'] and now > auction['window_end']:
-            raise AppFail("Auction window has ended", statuscode=400)
+            raise AppError("Auction window has ended", statuscode=400)
         if auction['type'] == 'closed':
             cur.execute(
                 "SELECT status FROM auction_participants WHERE auction_id=%s AND trader_id=%s",
@@ -427,18 +468,18 @@ def place_auction_order(auction_id: int):
             )
             participant = cur.fetchone()
             if not participant or participant['status'] != 'approved':
-                raise AppFail("Not approved to participate in this auction", statuscode=403)
+                raise AppError("Not approved to participate in this auction", statuscode=403)
         data = request.get_json(silent=True) or {}
         side = (data.get('type') or data.get('side') or '').strip()
         if side not in ('bid', 'ask'):
-            raise BadOrderData("Field 'side' (or 'type') must be 'bid' or 'ask'")
+            raise OrderDataError("Field 'type' (or 'side') must be 'bid' or 'ask'")
         try:
             price = to_decimal(data.get('price'))
             quantity = to_decimal(data.get('quantity'))
-        except BadOrderData:
-            raise BadOrderData("Fields 'price' and 'quantity' must be valid positive numbers")
+        except OrderDataError:
+            raise OrderDataError("Fields 'price' and 'quantity' must be valid positive numbers")
         if price <= 0 or quantity <= 0:
-            raise BadOrderData("'price' and 'quantity' must be positive")
+            raise OrderDataError("'price' and 'quantity' must be positive")
         reserve_amount: Decimal | None = None
         reserve_tx_id: int | None = None
         if side == 'bid':
@@ -449,7 +490,7 @@ def place_auction_order(auction_id: int):
                 "price": str(price),
                 "quantity": str(quantity)
             }
-            reserve_result = lock_money(conn, user['id'], reserve_amount, meta=reserve_meta)
+            reserve_result = wallet_reserve(conn, user['id'], reserve_amount, meta=reserve_meta)
             reserve_tx_id = reserve_result['txId']
         cur.close()
         cur = conn.cursor()
@@ -464,22 +505,25 @@ def place_auction_order(auction_id: int):
             tuple(values)
         )
         conn.commit()
-        response = {"message": "Order placed", "id": cur.lastrowid}
+        response = {
+            "message": "Order placed",
+            "id": cur.lastrowid
+        }
         if reserve_amount is not None:
             response["reservedAmount"] = float(reserve_amount)
         return jsonify(response), 201
-    except (AppFail, BadOrderData):
+    except AppError as error:
         try:
             conn.rollback()
         except Exception:
             pass
-        raise
+        raise error
     except Exception as exception:
         try:
             conn.rollback()
         except Exception:
             pass
-        raise DbFail("Error placing order", details=str(exception))
+        raise DBError("Error placing order", details=str(exception))
     finally:
         try:
             cur.close()
@@ -487,20 +531,33 @@ def place_auction_order(auction_id: int):
             pass
         conn.close()
 
-
 @auctions_bp.get('/admin/auctions/<int:auction_id>/orders')
-@need_admin
+@require_admin
 def list_auction_orders_admin(auction_id: int):
-    conn = open_db()
+    conn = db_connection()
     cur = conn.cursor(dictionary=True)
     try:
-        make_auctions_tables(conn)
+        ensure_auctions_tables(conn)
         cur.execute(
-            "SELECT id, trader_id, side, price, quantity, created_at, status, cleared_price, cleared_quantity "
-            "FROM auction_orders WHERE auction_id=%s ORDER BY created_at ASC",
+            """
+            SELECT id,
+                   trader_id,
+                   side,
+                   price,
+                   quantity,
+                   created_at,
+                   status,
+                   reserved_amount,
+                   reserve_tx_id,
+                   cleared_price,
+                   cleared_quantity
+            FROM auction_orders
+            WHERE auction_id=%s
+            ORDER BY created_at ASC
+            """,
             (auction_id,)
         )
-        return jsonify(to_plain(cur.fetchall()))
+        return jsonify(serialize(cur.fetchall()))
     finally:
         cur.close()
         conn.close()
@@ -522,21 +579,21 @@ def _generate_trade_document(auction_id: int, role: str, trader_id: int, amount:
     return path
 
 @auctions_bp.post('/admin/auctions/<int:auction_id>/clear')
-@need_admin
+@require_admin
 def clear_auction(auction_id: int):
-    conn = open_db()
+    conn = db_connection()
     cur = conn.cursor(dictionary=True)
     try:
-        make_auctions_tables(conn)
-        cur.execute("SELECT id, k_value, status, admin_id FROM auctions WHERE id=%s", (auction_id,))
+        ensure_auctions_tables(conn)
+        cur.execute("SELECT id, k_value, status FROM auctions WHERE id=%s", (auction_id,))
         auction = cur.fetchone()
         if not auction:
-            raise AppFail("Auction not found", statuscode=404)
+            raise AppError("Auction not found", statuscode=404)
         if auction['status'] != 'collecting':
-            raise AppFail("Auction not in collecting state", statuscode=400)
+            raise AppError("Auction not in collecting state", statuscode=400)
         admin_user = g.get('user')
         if auction.get('admin_id') and admin_user and auction['admin_id'] != admin_user['id']:
-            raise AppFail("Auction assigned to different administrator", statuscode=403)
+            raise AppError("Auction assigned to different administrator", statuscode=403)
         cur.execute(
             "SELECT id, trader_id, side, price, quantity, created_at, reserved_amount, reserve_tx_id "
             "FROM auction_orders WHERE auction_id=%s AND status='open'",
@@ -544,10 +601,17 @@ def clear_auction(auction_id: int):
         )
         raw_orders = cur.fetchall()
         if not raw_orders:
-            cur.close(); cur = conn.cursor()
-            cur.execute(
-                "UPDATE auctions SET status='cleared', closed_at=%s, admin_id=COALESCE(admin_id,%s) WHERE id=%s",
-                (datetime.datetime.utcnow(), admin_user['id'] if admin_user else None, auction_id)
+            cur.close()
+            cur = conn.cursor()
+            _record_clearing_state(
+                cur,
+                auction_id,
+                admin_user,
+                price=None,
+                quantity=None,
+                demand=Decimal('0'),
+                supply=Decimal('0'),
+                price_interval=None
             )
             conn.commit()
             return jsonify({
@@ -573,11 +637,21 @@ def clear_auction(auction_id: int):
         price = clearing['price']
         allocations = clearing['allocations']
         volume = clearing.get('volume', Decimal('0'))
+        demand_total = clearing.get('demand', Decimal('0'))
+        supply_total = clearing.get('supply', Decimal('0'))
+        price_interval = clearing.get('price_interval')
         if volume <= Decimal('0') or not allocations:
-            cur.close(); cur = conn.cursor()
-            cur.execute(
-                "UPDATE auctions SET status='cleared', closed_at=%s, admin_id=COALESCE(admin_id,%s) WHERE id=%s",
-                (datetime.datetime.utcnow(), admin_user['id'] if admin_user else None, auction_id)
+            cur.close()
+            cur = conn.cursor()
+            _record_clearing_state(
+                cur,
+                auction_id,
+                admin_user,
+                price=None,
+                quantity=None,
+                demand=demand_total,
+                supply=supply_total,
+                price_interval=price_interval
             )
             conn.commit()
             return jsonify({
@@ -585,28 +659,39 @@ def clear_auction(auction_id: int):
                 "price": None,
                 "volume": 0,
                 "allocations": [],
-                "demand": float(clearing.get('demand', Decimal('0'))),
-                "supply": float(clearing.get('supply', Decimal('0'))),
+                "demand": float(demand_total),
+                "supply": float(supply_total),
                 "priceInterval": None
             })
         allocation_map = {item['order_id']: item['cleared_qty'] for item in allocations}
-        cur.close(); cur = conn.cursor()
+        cur.close()
+        cur = conn.cursor()
         for row in raw_orders:
             cleared_qty = allocation_map.get(row['id'], Decimal('0'))
             cleared_qty = cleared_qty.quantize(DECIMAL_QUANT)
             allocation_map[row['id']] = cleared_qty
-            status_val = 'cleared' if cleared_qty > Decimal('0') else 'rejected'
+            status = 'cleared' if cleared_qty > Decimal('0') else 'rejected'
             cur.execute(
                 "UPDATE auction_orders SET status=%s, cleared_price=%s, cleared_quantity=%s WHERE id=%s",
-                (status_val, str(price), str(cleared_qty), row['id'])
+                (status, str(price), str(cleared_qty), row['id'])
             )
-        cur.execute(
-            "UPDATE auctions SET status='cleared', closed_at=%s, admin_id=COALESCE(admin_id,%s) WHERE id=%s",
-            (datetime.datetime.utcnow(), admin_user['id'] if admin_user else None, auction_id)
+        _record_clearing_state(
+            cur,
+            auction_id,
+            admin_user,
+            price=price,
+            quantity=volume,
+            demand=demand_total,
+            supply=supply_total,
+            price_interval=price_interval
         )
         for row in raw_orders:
             cleared_qty = allocation_map.get(row['id'], Decimal('0'))
-            order_meta = {"auctionId": auction_id, "orderId": row['id'], "side": row['side']}
+            order_meta = {
+                "auctionId": auction_id,
+                "orderId": row['id'],
+                "side": row['side']
+            }
             if row.get('reserve_tx_id') is not None:
                 order_meta["reserveTxId"] = row['reserve_tx_id']
             if row['side'] == 'bid':
@@ -617,17 +702,17 @@ def clear_auction(auction_id: int):
                 cleared_qty_quant = to_decimal(cleared_qty)
                 spent = (price * cleared_qty_quant).quantize(DECIMAL_QUANT)
                 if spent > Decimal('0'):
-                    spend_locked(conn, row['trader_id'], spent, meta=dict(order_meta, action='settle'))
+                    wallet_spend(conn, row['trader_id'], spent, meta=dict(order_meta, action='settle'))
                 remaining = reserved_total - spent
                 if remaining < Decimal('0'):
                     remaining = Decimal('0')
                 if remaining > Decimal('0'):
-                    unlock_money(conn, row['trader_id'], remaining, meta=dict(order_meta, action='release'))
+                    wallet_release(conn, row['trader_id'], remaining, meta=dict(order_meta, action='release'))
             elif row['side'] == 'ask' and cleared_qty > Decimal('0'):
                 cleared_qty_quant = to_decimal(cleared_qty)
                 proceeds = (price * cleared_qty_quant).quantize(DECIMAL_QUANT)
                 if proceeds > Decimal('0'):
-                    add_money(conn, row['trader_id'], proceeds, meta=dict(order_meta, action='credit'))
+                    wallet_deposit(conn, row['trader_id'], proceeds, meta=dict(order_meta, action='credit'))
         conn.commit()
         for row in raw_orders:
             cleared_qty = allocation_map.get(row['id'], Decimal('0'))
@@ -638,18 +723,18 @@ def clear_auction(auction_id: int):
             "message": "Auction cleared",
             "price": float(price),
             "volume": float(volume),
-            "demand": float(clearing.get('demand', Decimal('0'))),
-            "supply": float(clearing.get('supply', Decimal('0'))),
+            "demand": float(demand_total),
+            "supply": float(supply_total),
             "priceInterval": [
-                float(clearing['price_interval'][0]) if clearing['price_interval'][0] is not None else None,
-                float(clearing['price_interval'][1]) if clearing['price_interval'][1] is not None else None,
+                float(price_interval[0]) if price_interval and price_interval[0] is not None else None,
+                float(price_interval[1]) if price_interval and price_interval[1] is not None else None,
             ],
             "allocations": [
                 {"orderId": order_id, "quantity": float(quantity)}
                 for order_id, quantity in allocation_map.items()
             ]
         })
-    except AppFail as error:
+    except AppError as error:
         try:
             conn.rollback()
         except Exception:
@@ -660,7 +745,7 @@ def clear_auction(auction_id: int):
             conn.rollback()
         except Exception:
             pass
-        raise DbFail("Error clearing auction", details=str(exception))
+        raise DBError("Error clearing auction", details=str(exception))
     finally:
         try:
             cur.close()
@@ -670,14 +755,14 @@ def clear_auction(auction_id: int):
 
 @auctions_bp.get('/auctions/<int:auction_id>/participants/me')
 def my_participation_status(auction_id: int):
-    conn = open_db()
+    conn = db_connection()
     cur = conn.cursor(dictionary=True)
     try:
-        make_users_table(conn)
-        make_auctions_tables(conn)
-        user = fetch_user(conn)
+        ensure_users_table(conn)
+        ensure_auctions_tables(conn)
+        user = get_auth_user(conn)
         if not user:
-            raise AppFail("Unauthorized", statuscode=401)
+            raise AppError("Unauthorized", statuscode=401)
         cur.execute(
             "SELECT auction_id, trader_id, account_id, status FROM auction_participants WHERE auction_id=%s AND trader_id=%s",
             (auction_id, user['id'])
@@ -689,7 +774,7 @@ def my_participation_status(auction_id: int):
         conn.close()
 
 @auctions_bp.get('/admin/auctions/<int:auction_id>/documents')
-@need_admin
+@require_admin
 def list_auction_documents(auction_id: int):
     base_dir = os.path.join(current_app.config['GENERATED_DOCS_ROOT'], f'auction_{auction_id}')
     if not os.path.isdir(base_dir):
@@ -698,11 +783,11 @@ def list_auction_documents(auction_id: int):
     return jsonify(files)
 
 @auctions_bp.get('/admin/auctions/<int:auction_id>/documents/<path:filename>')
-@need_admin
+@require_admin
 def download_auction_document(auction_id: int, filename: str):
     if '..' in filename or filename.startswith('/') or filename.startswith('\\'):
-        raise AppFail("Invalid filename", statuscode=400)
+        raise AppError("Invalid filename", statuscode=400)
     base_dir = os.path.join(current_app.config['GENERATED_DOCS_ROOT'], f'auction_{auction_id}')
     if not os.path.isdir(base_dir):
-        raise AppFail("Not found", statuscode=404)
+        raise AppError("Not found", statuscode=404)
     return send_from_directory(base_dir, filename, as_attachment=True)

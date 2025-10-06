@@ -1,6 +1,6 @@
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any, Dict, List, Tuple
-from ..errors import BadOrderData
+from ..errors import OrderDataError
 
 def to_decimal(n) -> Decimal:
     try:
@@ -8,7 +8,7 @@ def to_decimal(n) -> Decimal:
             return n
         return Decimal(str(n))
     except Exception:
-        raise BadOrderData("Invalid numeric value")
+        raise OrderDataError("Invalid numeric value")
 
 DECIMAL_QUANT = Decimal('0.000001')
 

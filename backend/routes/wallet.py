@@ -6,9 +6,9 @@ from ..db import db_connection, ensure_users_table, ensure_wallet_tables
 from ..errors import AppError, OrderDataError
 from ..security import get_auth_user
 from ..services.wallet import (
-    get_wallet_stats,
-    add_money,
-    take_money,
+    wallet_balance,
+    wallet_deposit,
+    wallet_withdraw,
 )
 
 wallet_bp = Blueprint('wallet', __name__, url_prefix='/api/me/wallet')
@@ -37,7 +37,7 @@ def get_balance():
     user = current_user()
     conn = db_connection()
     try:
-        balances = get_wallet_stats(conn, user['id'])
+        balances = wallet_balance(conn, user['id'])
         return jsonify({
             "available": float(balances['available']),
             "reserved": float(balances['reserved']),
@@ -54,7 +54,7 @@ def deposit():
     amount = get_amount(data)
     conn = db_connection()
     try:
-        result = add_money(conn, user['id'], amount, meta={"source": "manual"})
+        result = wallet_deposit(conn, user['id'], amount, meta={"source": "manual"})
         conn.commit()
         return jsonify({
             "available": float(result['available']),
@@ -72,7 +72,7 @@ def withdraw():
     amount = get_amount(data)
     conn = db_connection()
     try:
-        result = take_money(conn, user['id'], amount, meta={"source": "manual"})
+        result = wallet_withdraw(conn, user['id'], amount, meta={"source": "manual"})
         conn.commit()
         return jsonify({
             "available": float(result['available']),

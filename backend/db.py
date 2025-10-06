@@ -3,20 +3,20 @@ from typing import Optional, List, Tuple
 from decimal import Decimal
 import datetime
 from .config import DB_CONFIG
-from .errors import DbFail
+from .errors import DBError
 
 
-def open_db():
+def db_connection():
     try:
         connection = connect(**DB_CONFIG)
         if connection.is_connected():
             return connection
-        raise DbFail("Database connection failed")
+        raise DBError("Database connection failed")
     except Error as exception:
-        raise DbFail("Database connection failed", details=str(exception))
+        raise DBError("Database connection failed", details=str(exception))
 
 
-def make_users_table(connection):
+def ensure_users_table(connection):
     cursor = connection.cursor()
     try:
         cursor.execute(
@@ -35,7 +35,7 @@ def make_users_table(connection):
     finally:
         cursor.close()
 
-def make_user_profiles(connection):
+def ensure_user_profiles(connection):
     cur = connection.cursor()
     try:
         cur.execute(
@@ -83,7 +83,7 @@ def make_user_profiles(connection):
     finally:
         cur.close()
 
-def make_listings_table(connection):
+def ensure_listings_table(connection):
     cursor = connection.cursor()
     try:
         cursor.execute(
@@ -125,7 +125,7 @@ def make_listings_table(connection):
     finally:
         cursor.close()
 
-def make_orders_table(connection):
+def ensure_orders_table(connection):
     cursor = connection.cursor()
     try:
         cursor.execute(
@@ -149,7 +149,7 @@ def make_orders_table(connection):
     finally:
         cursor.close()
 
-def make_trades_table(connection):
+def ensure_trades_table(connection):
     cursor = connection.cursor()
     try:
         cursor.execute(
@@ -171,7 +171,7 @@ def make_trades_table(connection):
     finally:
         cursor.close()
 
-def make_auctions_tables(connection):
+def ensure_auctions_tables(connection):
     cur = connection.cursor()
     try:
         cur.execute(
@@ -187,15 +187,31 @@ def make_auctions_tables(connection):
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 closed_at DATETIME NULL,
                 admin_id INT NULL,
+                listing_id INT NULL,
+                clearing_price DECIMAL(18,6) NULL,
+                clearing_quantity DECIMAL(18,6) NULL,
+                clearing_demand DECIMAL(18,6) NULL,
+                clearing_supply DECIMAL(18,6) NULL,
+                clearing_price_low DECIMAL(18,6) NULL,
+                clearing_price_high DECIMAL(18,6) NULL,
                 INDEX idx_auctions_status (status),
                 INDEX idx_auctions_created (created_at)
             ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
             """
         )
-        try:
-            cur.execute("ALTER TABLE auctions ADD COLUMN listing_id INT NULL")
-        except Exception:
-            pass
+        for column_name, column_def in [
+            ("listing_id", "INT NULL"),
+            ("clearing_price", "DECIMAL(18,6) NULL"),
+            ("clearing_quantity", "DECIMAL(18,6) NULL"),
+            ("clearing_demand", "DECIMAL(18,6) NULL"),
+            ("clearing_supply", "DECIMAL(18,6) NULL"),
+            ("clearing_price_low", "DECIMAL(18,6) NULL"),
+            ("clearing_price_high", "DECIMAL(18,6) NULL"),
+        ]:
+            try:
+                cur.execute(f"ALTER TABLE auctions ADD COLUMN {column_name} {column_def}")
+            except Exception:
+                pass
         try:
             cur.execute("ALTER TABLE auctions ADD INDEX idx_auctions_listing (listing_id)")
         except Exception:
@@ -250,11 +266,29 @@ def make_auctions_tables(connection):
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """
         )
+        # Ensure legacy deployments receive newly required columns/indexes
+        for column_def in [
+            ("iteration", "INT NULL"),
+            ("reserved_amount", "DECIMAL(18,6) NULL"),
+            ("reserve_tx_id", "INT NULL"),
+        ]:
+            try:
+                cur.execute(f"ALTER TABLE auction_orders ADD COLUMN {column_def[0]} {column_def[1]}")
+            except Exception:
+                pass
+        for index_def in [
+            "ALTER TABLE auction_orders ADD INDEX idx_ao_auction (auction_id)",
+            "ALTER TABLE auction_orders ADD INDEX idx_ao_auction_status (auction_id, status)",
+        ]:
+            try:
+                cur.execute(index_def)
+            except Exception:
+                pass
         connection.commit()
     finally:
         cur.close()
 
-def make_resource_transactions(connection):
+def ensure_resource_transactions(connection):
     cur = connection.cursor()
     try:
         cur.execute(
@@ -275,7 +309,7 @@ def make_resource_transactions(connection):
     finally:
         cur.close()
 
-def make_resource_documents(connection):
+def ensure_resource_documents(connection):
     cur = connection.cursor()
     try:
         cur.execute(
@@ -296,7 +330,7 @@ def make_resource_documents(connection):
     finally:
         cur.close()
 
-def make_wallet_tables(connection):
+def ensure_wallet_tables(connection):
     cur = connection.cursor()
     try:
         cur.execute(
@@ -331,20 +365,20 @@ def make_wallet_tables(connection):
         cur.close()
 
 __all__ = [
-    'open_db',
-    'make_users_table',
-    'make_user_profiles',
-    'make_listings_table',
-    'make_orders_table',
-    'make_trades_table',
-    'make_auctions_tables',
-    'make_resource_transactions',
-    'make_resource_documents',
-    'make_wallet_tables',
-    'try_add_owner_cols',
+    'db_connection',
+    'ensure_users_table',
+    'ensure_user_profiles',
+    'ensure_listings_table',
+    'ensure_orders_table',
+    'ensure_trades_table',
+    'ensure_auctions_tables',
+    'ensure_resource_transactions',
+    'ensure_resource_documents',
+    'ensure_wallet_tables',
+    'try_add_owner_columns',
 ]
 
-def try_add_owner_cols(connection):
+def try_add_owner_columns(connection):
     cur = connection.cursor()
     try:
         try:

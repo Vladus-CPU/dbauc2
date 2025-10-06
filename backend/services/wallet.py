@@ -4,8 +4,7 @@ from typing import Optional, Tuple
 from ..errors import AppError, OrderDataError
 from ..db import ensure_wallet_tables
 
-def make_wallet_if_missing(conn, user_id: int):
-    """Create wallet row if it does not exist (student style helper)."""
+def _ensure_wallet_row(conn, user_id: int):
     ensure_wallet_tables(conn)
     cur = conn.cursor()
     try:
@@ -16,8 +15,7 @@ def make_wallet_if_missing(conn, user_id: int):
     finally:
         cur.close()
 
-def fetch_balances(conn, user_id: int) -> Tuple[Decimal, Decimal]:
-    """Get current available + reserved balances."""
+def _get_balances(conn, user_id: int) -> Tuple[Decimal, Decimal]:
     cur = conn.cursor()
     try:
         cur.execute("SELECT available, reserved FROM wallet_accounts WHERE user_id=%s", (user_id,))
@@ -28,8 +26,7 @@ def fetch_balances(conn, user_id: int) -> Tuple[Decimal, Decimal]:
     finally:
         cur.close()
 
-def write_tx_row(conn, user_id: int, tx_type: str, amount: Decimal, available: Decimal, meta: Optional[dict]):
-    """Persist a transaction row and return its id."""
+def _log_tx(conn, user_id: int, tx_type: str, amount: Decimal, available: Decimal, meta: Optional[dict]):
     cur = conn.cursor()
     try:
         cur.execute(
@@ -40,24 +37,24 @@ def write_tx_row(conn, user_id: int, tx_type: str, amount: Decimal, available: D
     finally:
         cur.close()
 
-def add_money(conn, user_id: int, amount: Decimal, meta: Optional[dict] = None):
+def wallet_deposit(conn, user_id: int, amount: Decimal, meta: Optional[dict] = None):
     if amount <= 0:
         raise OrderDataError("Deposit amount must be positive")
-    make_wallet_if_missing(conn, user_id)
+    _ensure_wallet_row(conn, user_id)
     cur = conn.cursor()
     try:
         cur.execute("UPDATE wallet_accounts SET available = available + %s WHERE user_id=%s", (str(amount), user_id))
     finally:
         cur.close()
-    available, reserved = fetch_balances(conn, user_id)
-    tx_id = write_tx_row(conn, user_id, 'deposit', amount, available, meta)
+    available, reserved = _get_balances(conn, user_id)
+    tx_id = _log_tx(conn, user_id, 'deposit', amount, available, meta)
     return {'available': available, 'reserved': reserved, 'txId': tx_id}
 
-def take_money(conn, user_id: int, amount: Decimal, meta: Optional[dict] = None):
+def wallet_withdraw(conn, user_id: int, amount: Decimal, meta: Optional[dict] = None):
     if amount <= 0:
         raise OrderDataError("Withdraw amount must be positive")
-    make_wallet_if_missing(conn, user_id)
-    available, reserved = fetch_balances(conn, user_id)
+    _ensure_wallet_row(conn, user_id)
+    available, reserved = _get_balances(conn, user_id)
     if available < amount:
         raise AppError("Insufficient balance", statuscode=400)
     cur = conn.cursor()
@@ -66,14 +63,14 @@ def take_money(conn, user_id: int, amount: Decimal, meta: Optional[dict] = None)
     finally:
         cur.close()
     available -= amount
-    tx_id = write_tx_row(conn, user_id, 'withdraw', -amount, available, meta)
+    tx_id = _log_tx(conn, user_id, 'withdraw', -amount, available, meta)
     return {'available': available, 'reserved': reserved, 'txId': tx_id}
 
-def lock_money(conn, user_id: int, amount: Decimal, meta: Optional[dict] = None):
+def wallet_reserve(conn, user_id: int, amount: Decimal, meta: Optional[dict] = None):
     if amount <= 0:
         raise OrderDataError("Reserve amount must be positive")
-    make_wallet_if_missing(conn, user_id)
-    available, reserved = fetch_balances(conn, user_id)
+    _ensure_wallet_row(conn, user_id)
+    available, reserved = _get_balances(conn, user_id)
     if available < amount:
         raise AppError("Insufficient balance", statuscode=400)
     cur = conn.cursor()
@@ -86,15 +83,15 @@ def lock_money(conn, user_id: int, amount: Decimal, meta: Optional[dict] = None)
         cur.close()
     available -= amount
     reserved += amount
-    tx_id = write_tx_row(conn, user_id, 'reserve', -amount, available, meta)
+    tx_id = _log_tx(conn, user_id, 'reserve', -amount, available, meta)
     return {'available': available, 'reserved': reserved, 'txId': tx_id}
 
-def unlock_money(conn, user_id: int, amount: Decimal, meta: Optional[dict] = None):
+def wallet_release(conn, user_id: int, amount: Decimal, meta: Optional[dict] = None):
     if amount <= 0:
-        balances = get_wallet_stats(conn, user_id)
+        balances = wallet_balance(conn, user_id)
         return {'available': balances['available'], 'reserved': balances['reserved']}
-    make_wallet_if_missing(conn, user_id)
-    available, reserved = fetch_balances(conn, user_id)
+    _ensure_wallet_row(conn, user_id)
+    available, reserved = _get_balances(conn, user_id)
     if reserved < amount:
         amount = reserved
     cur = conn.cursor()
@@ -107,15 +104,15 @@ def unlock_money(conn, user_id: int, amount: Decimal, meta: Optional[dict] = Non
         cur.close()
     available += amount
     reserved -= amount
-    tx_id = write_tx_row(conn, user_id, 'release', amount, available, meta)
+    tx_id = _log_tx(conn, user_id, 'release', amount, available, meta)
     return {'available': available, 'reserved': reserved, 'txId': tx_id}
 
-def spend_locked(conn, user_id: int, amount: Decimal, meta: Optional[dict] = None):
+def wallet_spend(conn, user_id: int, amount: Decimal, meta: Optional[dict] = None):
     if amount <= 0:
-        balances = get_wallet_stats(conn, user_id)
+        balances = wallet_balance(conn, user_id)
         return {'available': balances['available'], 'reserved': balances['reserved']}
-    make_wallet_if_missing(conn, user_id)
-    available, reserved = fetch_balances(conn, user_id)
+    _ensure_wallet_row(conn, user_id)
+    available, reserved = _get_balances(conn, user_id)
     if reserved < amount:
         raise AppError("Insufficient reserved funds", statuscode=400)
     cur = conn.cursor()
@@ -127,19 +124,19 @@ def spend_locked(conn, user_id: int, amount: Decimal, meta: Optional[dict] = Non
     finally:
         cur.close()
     reserved -= amount
-    tx_id = write_tx_row(conn, user_id, 'spend', -amount, available, meta)
+    tx_id = _log_tx(conn, user_id, 'spend', -amount, available, meta)
     return {'available': available, 'reserved': reserved, 'txId': tx_id}
 
-def get_wallet_stats(conn, user_id: int):
-    make_wallet_if_missing(conn, user_id)
-    available, reserved = fetch_balances(conn, user_id)
+def wallet_balance(conn, user_id: int):
+    _ensure_wallet_row(conn, user_id)
+    available, reserved = _get_balances(conn, user_id)
     return {'available': available, 'reserved': reserved, 'total': available + reserved}
 
 __all__ = [
-    'add_money',
-    'take_money',
-    'lock_money',
-    'unlock_money',
-    'spend_locked',
-    'get_wallet_stats',
+    'wallet_deposit',
+    'wallet_withdraw',
+    'wallet_reserve',
+    'wallet_release',
+    'wallet_spend',
+    'wallet_balance',
 ]
