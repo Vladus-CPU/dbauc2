@@ -52,7 +52,6 @@ function formatDate(value) {
   }).format(date);
 }
 
-// Локальні утиліти (без окремого i18n модуля)
 function tStatus(value) {
   const map = {
     collecting: 'Збір заявок',
