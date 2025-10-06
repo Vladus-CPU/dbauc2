@@ -48,3 +48,16 @@ export async function placeAuctionOrder(auctionId, { type, price, quantity }) {
     }
     return res.json();
 }
+
+export async function seedRandomAuctionOrders(auctionId, options = {}) {
+    const res = await authorizedFetch(`/api/admin/auctions/${auctionId}/seed_random`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(options)
+    });
+    if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`Не вдалося згенерувати випадкові заявки: ${res.status} ${txt}`);
+    }
+    return res.json();
+}

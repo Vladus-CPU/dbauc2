@@ -1,4 +1,4 @@
-import { getMyProfile, listAuctions, createAuction, clearAuction, closeAuction, listParticipantsAdmin, approveParticipant, listAuctionOrdersAdmin, listAuctionDocuments, listAdminUsers, promoteUser, demoteUser, authorizedFetch, adminWalletSummary, adminWalletAction, adminWalletTransactions } from '../api.js';
+import { getMyProfile, listAuctions, createAuction, clearAuction, closeAuction, listParticipantsAdmin, approveParticipant, listAuctionOrdersAdmin, listAuctionDocuments, listAdminUsers, promoteUser, demoteUser, authorizedFetch, adminWalletSummary, adminWalletAction, adminWalletTransactions, seedRandomAuctionOrders } from '../api.js';
 import { showToast } from '../ui/toast.js';
 import { initAccessControl } from '../ui/session.js';
 
@@ -577,7 +577,67 @@ async function render() {
 	if (!auctions.length) {
 		listWrap.textContent = 'Аукціони ще не створено';
 	} else {
-		auctions.forEach(a => listWrap.appendChild(auctionRow(a)));
+		auctions.forEach(a => {
+			const card = auctionRow(a);
+			// Inject seeding form for collecting auctions
+			if (a.status === 'collecting') {
+				const seedForm = el('form', { className: 'inline-form auction-seed-form', style: 'margin-top:12px;' });
+				seedForm.innerHTML = `
+					<fieldset style="display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;border:1px solid rgba(255,255,255,0.08);padding:8px 10px;border-radius:8px;">
+						<legend style="font-size:0.75rem;letter-spacing:0.08em;text-transform:uppercase;padding:0 4px;">Генерація ботів</legend>
+						<label style="display:flex;flex-direction:column;font-size:0.7rem;gap:2px;">
+							<span>К-сть</span>
+							<input name="count" type="number" min="1" max="50" value="5" class="form__input" style="width:68px;">
+						</label>
+						<label style="display:flex;flex-direction:column;font-size:0.7rem;gap:2px;">
+							<span>Bid/тр</span>
+							<input name="bidsPerTrader" type="number" min="0" max="10" value="1" class="form__input" style="width:60px;">
+						</label>
+						<label style="display:flex;flex-direction:column;font-size:0.7rem;gap:2px;">
+							<span>Ask/тр</span>
+							<input name="asksPerTrader" type="number" min="0" max="10" value="1" class="form__input" style="width:60px;">
+						</label>
+						<label style="display:flex;flex-direction:column;font-size:0.7rem;gap:2px;">
+							<span>Спред %</span>
+							<input name="priceSpread" type="number" min="0.1" max="50" step="0.1" value="5" class="form__input" style="width:72px;">
+						</label>
+						<label style="display:flex;flex-direction:column;font-size:0.7rem;gap:2px;">
+							<span>Qty min</span>
+							<input name="quantityMin" type="number" min="0.000001" step="0.01" value="1" class="form__input" style="width:80px;">
+						</label>
+						<label style="display:flex;flex-direction:column;font-size:0.7rem;gap:2px;">
+							<span>Qty max</span>
+							<input name="quantityMax" type="number" min="0.000001" step="0.01" value="10" class="form__input" style="width:80px;">
+						</label>
+						<button type="submit" class="btn btn-primary btn-compact" style="margin-left:4px;">Згенерувати</button>
+						<button type="button" data-role="refresh-orders" class="btn btn-ghost btn-compact" title="Оновити дані">↻</button>
+						<span class="seed-status muted" style="font-size:0.7rem;margin-left:auto;"></span>
+					</fieldset>`;
+				const statusEl = seedForm.querySelector('.seed-status');
+				seedForm.addEventListener('submit', async (ev) => {
+					ev.preventDefault();
+					const fd = new FormData(seedForm);
+					const payload = Object.fromEntries([...fd.entries()].map(([k,v]) => [k, v === '' ? undefined : (isNaN(Number(v))? v : Number(v))]));
+					statusEl.textContent = 'Створення...';
+					try {
+						await seedRandomAuctionOrders(a.id, payload);
+						statusEl.textContent = 'Готово';
+						showToast('Заявки згенеровано', 'success');
+						setTimeout(()=>{ statusEl.textContent=''; }, 2500);
+						await render();
+					} catch (e) {
+						statusEl.textContent = 'Помилка';
+						showToast(e?.message || 'Не вдалося згенерувати', 'error');
+					}
+				});
+				seedForm.querySelector('[data-role="refresh-orders"]').addEventListener('click', async () => {
+					showToast('Оновлення...', 'info');
+					await render();
+				});
+				card.appendChild(seedForm);
+			}
+			listWrap.appendChild(card);
+		});
 	}
 	auctionsCard.appendChild(listWrap);
 	main.appendChild(auctionsCard);
