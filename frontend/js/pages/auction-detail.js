@@ -160,17 +160,16 @@ function renderBook(book) {
 
 function renderMetrics(book) {
   const m = book.metrics;
-  // Initialize / update local metric history for micro charts
   const history = window.__auctionMetricHistory || (window.__auctionMetricHistory = {
     spread: [],
     midPrice: [],
-    depthImbalancePct: [], // stored as percent value
+    depthImbalancePct: [],
     lastClearingPrice: []
   });
   const pushMetric = (key, val) => {
     if (typeof val === 'number' && isFinite(val)) {
       history[key].push(val);
-      if (history[key].length > 120) history[key].shift(); // keep last ~120 samples
+      if (history[key].length > 120) history[key].shift();
     }
   };
   pushMetric('spread', m.spread);
@@ -181,6 +180,7 @@ function renderMetrics(book) {
   metricsEl.innerHTML = '';
   const rows = [
     ['Спред', m.spread, 'spread'],
+    m.isCrossedMarket ? ['⚠️ Перехрещений ринок', 'так'] : null,
     ['Середня (mid) ціна', m.midPrice, 'midPrice'],
     ['Обсяг купівлі', m.totalBidQuantity],
     ['Обсяг продажу', m.totalAskQuantity],
@@ -227,7 +227,7 @@ function renderMetrics(book) {
     </svg>`;
   }
 
-  rows.forEach(([label, value, key]) => {
+  rows.filter(Boolean).forEach(([label, value, key]) => {
     const dt = document.createElement('dt');
     dt.textContent = label;
     const dd = document.createElement('dd');

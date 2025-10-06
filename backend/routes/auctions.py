@@ -187,8 +187,16 @@ def auction_order_book(auction_id: int):
         best_bid = float(best_bid_dec) if best_bid_dec is not None else None
         best_ask = float(best_ask_dec) if best_ask_dec is not None else None
         spread = None
+        is_crossed_market = False
         if best_bid_dec is not None and best_ask_dec is not None:
-            spread = float((best_ask_dec - best_bid_dec).quantize(DECIMAL_QUANT))
+            try:
+                spread_val = (best_ask_dec - best_bid_dec).quantize(DECIMAL_QUANT)
+            except Exception:
+                spread_val = (best_ask_dec - best_bid_dec)
+            spread = float(spread_val)
+            if spread < 0:
+                # crossed market (best bid >= best ask) – keep signed spread but flag it
+                is_crossed_market = True
         mid_price = None
         if best_bid_dec is not None and best_ask_dec is not None:
             try:
@@ -229,6 +237,7 @@ def auction_order_book(auction_id: int):
             "bestBid": best_bid,
             "bestAsk": best_ask,
             "spread": spread,
+            "isCrossedMarket": is_crossed_market,
             "midPrice": mid_price,
             "totalBidQuantity": float(total_bid_qty),
             "totalAskQuantity": float(total_ask_qty),
@@ -843,6 +852,7 @@ def seed_random_orders(auction_id: int):
     bids_per = int(data.get('bidsPerTrader') or 1)
     asks_per = int(data.get('asksPerTrader') or 1)
     price_spread_pct = float(data.get('priceSpread') or 5.0)
+    allow_cross = bool(data.get('allowCross'))
     qty_min = float(data.get('quantityMin') or 1.0)
     qty_max = float(data.get('quantityMax') or 10.0)
     if count < 1 or count > 200:
@@ -910,7 +920,8 @@ def seed_random_orders(auction_id: int):
             # Generate bid & ask orders
             import random
             for _ in range(bids_per):
-                price_delta = price_center * (random.uniform(-price_spread_pct, price_spread_pct) / 100.0)
+                # bias bid prices to be at or below center
+                price_delta = price_center * (random.uniform(-price_spread_pct, 0) / 100.0)
                 price = max(0.000001, price_center + price_delta)
                 qty = random.uniform(qty_min, qty_max)
                 cur.execute(
@@ -919,7 +930,8 @@ def seed_random_orders(auction_id: int):
                 )
                 order_rows.append({"side": "bid", "price": price, "quantity": qty})
             for _ in range(asks_per):
-                price_delta = price_center * (random.uniform(-price_spread_pct, price_spread_pct) / 100.0)
+                # bias ask prices to be at or above center
+                price_delta = price_center * (random.uniform(0, price_spread_pct) / 100.0)
                 price = max(0.000001, price_center + price_delta)
                 qty = random.uniform(qty_min, qty_max)
                 cur.execute(
@@ -927,6 +939,20 @@ def seed_random_orders(auction_id: int):
                     (auction_id, user_id, price, qty)
                 )
                 order_rows.append({"side": "ask", "price": price, "quantity": qty})
+        if not allow_cross:
+            # After insertion, optionally clean any accidental cross by adjusting a few orders outward
+            # (lightweight approach: ensure max bid < min ask by small tick if violated)
+            cur.execute("SELECT MAX(price) bb FROM auction_orders WHERE auction_id=%s AND side='bid' AND status='open'", (auction_id,))
+            bb = cur.fetchone()['bb']
+            cur.execute("SELECT MIN(price) ba FROM auction_orders WHERE auction_id=%s AND side='ask' AND status='open'", (auction_id,))
+            ba = cur.fetchone()['ba']
+            try:
+                if bb is not None and ba is not None and float(bb) >= float(ba):
+                    # widen ask side slightly
+                    widen = (float(bb) - float(ba)) + (float(price_center) * 0.0001)
+                    cur.execute("UPDATE auction_orders SET price=price + %s WHERE auction_id=%s AND side='ask' AND status='open'", (widen, auction_id))
+            except Exception:
+                pass
         conn.commit()
         return jsonify({
             "message": "Seeded random orders",
