@@ -52,8 +52,9 @@ const state = {
   autoTimer: null,
   nextRefreshAt: null,
   lastUpdated: null,
-  filters: { search: '', status: 'all' },
+  filters: { search: '', status: 'all', sort: 'start_asc' },
   session: null,
+  compact: false,
 };
 
 function applyFilters() {
@@ -68,6 +69,24 @@ function applyFilters() {
       if (!idMatch && !prodMatch) return false;
     }
     return true;
+  });
+  // Sorting
+  const sort = state.filters.sort;
+  const getTime = (d)=> new Date(d||0).getTime();
+  state.filtered.sort((a,b)=>{
+    switch(sort){
+      case 'start_asc': return getTime(a.window_start)-getTime(b.window_start);
+      case 'start_desc': return getTime(b.window_start)-getTime(a.window_start);
+      case 'end_asc': return getTime(a.window_end)-getTime(b.window_end);
+      case 'end_desc': return getTime(b.window_end)-getTime(a.window_end);
+      case 'created_asc': return getTime(a.created_at)-getTime(b.created_at);
+      case 'created_desc': return getTime(b.created_at)-getTime(a.created_at);
+      case 'k_asc': return (a.k_value||0)-(b.k_value||0);
+      case 'k_desc': return (b.k_value||0)-(a.k_value||0);
+      case 'product_desc': return (b.product||'').localeCompare(a.product||'','uk');
+      case 'product_asc': return (a.product||'').localeCompare(b.product||'','uk');
+      default: return 0;
+    }
   });
 }
 
@@ -296,6 +315,8 @@ function renderLists() {
     collecting.forEach(a => {
       const card = createCollectingCard(a, state.session, refresh);
       if (a.status === 'collecting') card.classList.add('collecting-highlight');
+      // Animate insert
+      card.style.animation='fadeIn .35s';
       collectingList.appendChild(card);
     });
   }
@@ -336,8 +357,8 @@ function scheduleAuto(){
 async function hardRefresh(){
   const collectingList = document.getElementById('collecting-list');
   const clearedList = document.getElementById('cleared-list');
-  if (collectingList) collectingList.textContent='Завантаження…';
-  if (clearedList) clearedList.textContent='Завантаження…';
+  if (collectingList) collectingList.innerHTML = skeletonBlock(3);
+  if (clearedList) clearedList.innerHTML = skeletonBlock(2);
   try{
     state.all = await listAuctions();
     state.lastUpdated = Date.now();
@@ -374,13 +395,25 @@ function attachUI(){
   const refreshBtn = document.getElementById('auction-refresh-btn');
   const auto = document.getElementById('auction-auto-refresh');
   const expandBtn = document.getElementById('history-expand-btn');
+  const sortSel = document.getElementById('auction-filter-sort');
+  const compactToggle = document.getElementById('auction-compact-toggle');
   if (search){
     let t; search.addEventListener('input', (e)=>{ clearTimeout(t); t=setTimeout(()=>{ state.filters.search=e.target.value.trim(); applyFilters(); renderLists(); },300);});
   }
   if (statusSel){ statusSel.addEventListener('change', e=>{ state.filters.status=e.target.value; applyFilters(); renderLists(); }); }
+  if (sortSel){ sortSel.addEventListener('change', e=>{ state.filters.sort = e.target.value; applyFilters(); renderLists(); }); }
+  if (compactToggle){ compactToggle.addEventListener('change', ()=>{ state.compact = compactToggle.checked; const container=document.querySelector('.auctions-container'); if(container){ container.classList.toggle('compact', state.compact);} }); }
   if (refreshBtn){ refreshBtn.addEventListener('click', ()=> hardRefresh()); }
   if (auto){ auto.addEventListener('change', ()=> { scheduleAuto(); }); }
   if (expandBtn){ expandBtn.addEventListener('click', ()=> { const expanded = expandBtn.getAttribute('aria-expanded')==='true'; expandBtn.setAttribute('aria-expanded', String(!expanded)); state.historySlice = expanded?6:30; renderLists(); }); }
+}
+
+function skeletonBlock(n){
+  let html='';
+  for(let i=0;i<n;i++){
+    html += `<div class="auction-skeleton"><div class="auction-skel-line" style="width:40%"></div><div class="auction-skel-line" style="width:65%"></div><div class="auction-skel-line" style="width:80%"></div></div>`;
+  }
+  return html;
 }
 
 document.addEventListener('DOMContentLoaded', async () => {

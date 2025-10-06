@@ -26,6 +26,25 @@
 #auction-last-updated {font-size:0.7rem;letter-spacing:.05em;text-transform:uppercase;}
 .countdown-badge {background:rgba(255,255,255,.08);padding:2px 6px;border-radius:6px;font-size:0.65rem;letter-spacing:.05em;}
 
+/* Compact density toggle */
+.auctions-container.compact .auction-card {padding:10px 12px;border-radius:10px;gap:8px;}
+.auctions-container.compact .auction-card .auction-card__meta {font-size:0.75rem;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));}
+.auctions-container.compact .auction-card .stack-card__header {font-size:0.85rem;}
+.auctions-container.compact .auction-card .auction-card__summary {font-size:0.75rem;}
+
+/* Skeleton loading */
+.auction-skeleton {display:grid;gap:10px;padding:16px;border:1px solid rgba(255,255,255,0.06);border-radius:14px;background:linear-gradient(135deg,rgba(255,255,255,0.02),rgba(255,255,255,0.04));position:relative;overflow:hidden;}
+.auction-skeleton::after {content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,0.15) 45%,rgba(255,255,255,0) 80%);animation:sweep 1.25s linear infinite;}
+.auction-skel-line {height:10px;border-radius:4px;background:rgba(255,255,255,0.08);}
+@keyframes sweep {from{transform:translateX(-100%);} to{transform:translateX(100%);} }
+
+/* Subtle transitions */
+.auction-card, .auction-skeleton {transition:background .25s, box-shadow .25s, transform .2s;}
+.auction-card:hover {background:rgba(255,255,255,0.04);}
+.auction-card:active {transform:translateY(1px);} 
+
+@keyframes fadeIn {from{opacity:0;transform:translateY(4px);} to{opacity:1;transform:translateY(0);} }
+
 .dashboard-card--toolbar {padding-top:18px;padding-bottom:18px;}
 
 /* History expand */
