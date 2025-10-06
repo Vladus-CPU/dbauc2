@@ -1148,3 +1148,105 @@ def auction_history(auction_id: int):
         except Exception:
             pass
         conn.close()
+
+@auctions_bp.post('/admin/bots/purge')
+@require_admin
+def purge_all_bots():
+    """Globally remove all bot users (username LIKE 'bot_%') with ALL their data.
+
+    Steps:
+      - Identify bot user ids
+      - Delete orders, participants, wallet tx/accounts, profiles, users
+    """
+    prefix = (request.get_json(silent=True) or {}).get('usernamePrefix') or 'bot_'
+    like_pattern = prefix + '%'
+    conn = db_connection()
+    cur = conn.cursor()
+    try:
+        ensure_users_table(conn); ensure_auctions_tables(conn); ensure_wallet_tables(conn); ensure_user_profiles(conn)
+        cur.execute("SELECT id FROM users WHERE username LIKE %s", (like_pattern,))
+        ids = [row[0] for row in cur.fetchall()]
+        if not ids:
+            return jsonify({"message": "No bot users", "removedUsers": 0})
+        id_list = ','.join(['%s']*len(ids))
+        # Delete dependent rows
+        cur.execute(f"DELETE FROM auction_orders WHERE trader_id IN ({id_list})", tuple(ids))
+        orders_removed = cur.rowcount
+        cur.execute(f"DELETE FROM auction_participants WHERE trader_id IN ({id_list})", tuple(ids))
+        parts_removed = cur.rowcount
+        cur.execute(f"DELETE FROM wallet_transactions WHERE user_id IN ({id_list})", tuple(ids))
+        tx_removed = cur.rowcount
+        cur.execute(f"DELETE FROM wallet_accounts WHERE user_id IN ({id_list})", tuple(ids))
+        wallets_removed = cur.rowcount
+        cur.execute(f"DELETE FROM traders_profile WHERE user_id IN ({id_list})", tuple(ids))
+        profiles_removed = cur.rowcount
+        cur.execute(f"DELETE FROM users WHERE id IN ({id_list})", tuple(ids))
+        users_removed = cur.rowcount
+        conn.commit()
+        return jsonify({
+            "message": "Bots purged",
+            "usernamePrefix": prefix,
+            "removedUsers": users_removed,
+            "removedOrders": orders_removed,
+            "removedParticipants": parts_removed,
+            "removedWalletTransactions": tx_removed,
+            "removedWalletAccounts": wallets_removed,
+            "removedProfiles": profiles_removed,
+            "botIds": ids
+        })
+    except AppError:
+        try: conn.rollback()
+        except Exception: pass
+        raise
+    except Exception as e:
+        try: conn.rollback()
+        except Exception: pass
+        raise DBError("Error purging bots", details=str(e))
+    finally:
+        try: cur.close()
+        except Exception: pass
+        conn.close()
+
+@auctions_bp.get('/auctions/<int:auction_id>/distribution')
+def auction_price_distribution(auction_id: int):
+    """Return histogram-like distribution of current open bid/ask prices and mid.
+
+    Output: { mid, bestBid, bestAsk, bids:[{p,qty,count}], asks:[{p,qty,count}] }
+    """
+    conn = db_connection(); cur = conn.cursor(dictionary=True)
+    try:
+        ensure_auctions_tables(conn)
+        cur.execute("SELECT id FROM auctions WHERE id=%s", (auction_id,))
+        if not cur.fetchone():
+            raise AppError("Auction not found", statuscode=404)
+        cur.execute("SELECT side, price, quantity FROM auction_orders WHERE auction_id=%s AND status='open'", (auction_id,))
+        rows = cur.fetchall()
+        from collections import defaultdict
+        agg = { 'bid': defaultdict(lambda: {'p': None,'qty':0.0,'count':0}), 'ask': defaultdict(lambda: {'p': None,'qty':0.0,'count':0}) }
+        best_bid = None; best_ask = None
+        for r in rows:
+            side = r['side']; price = float(r['price']); qty = float(r['quantity'])
+            if side == 'bid':
+                best_bid = price if (best_bid is None or price>best_bid) else best_bid
+            else:
+                best_ask = price if (best_ask is None or price<best_ask) else best_ask
+            bucket = round(price, 4)  # bucket precision
+            cell = agg[side][bucket]
+            cell['p'] = bucket; cell['qty'] += qty; cell['count'] += 1
+        bids = sorted(agg['bid'].values(), key=lambda x: x['p'], reverse=True)
+        asks = sorted(agg['ask'].values(), key=lambda x: x['p'])
+        mid = None
+        if best_bid is not None and best_ask is not None:
+            mid = (best_bid + best_ask)/2
+        return jsonify({
+            'auctionId': auction_id,
+            'mid': mid,
+            'bestBid': best_bid,
+            'bestAsk': best_ask,
+            'bids': bids,
+            'asks': asks
+        })
+    finally:
+        try: cur.close()
+        except Exception: pass
+        conn.close()
