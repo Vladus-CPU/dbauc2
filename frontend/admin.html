@@ -27,11 +27,24 @@
         <a href="admin.html" class="nav-link active" data-role-required="admin">Адмін</a>
       </nav>
     </header>
-    <main class="container">
-      <section class="dashboard-card dashboard-card--header">
-        <div id="admin-profile-summary">Завантаження...</div>
-      </section>
+    <main class="container admin-layout">
+      <aside class="admin-sidebar">
+        <section class="dashboard-card dashboard-card--header">
+          <div id="admin-profile-summary">Завантаження...</div>
+          <nav class="admin-sidebar__nav" id="admin-quick-nav">
+            <a href="#overview" class="admin-nav-link">Огляд</a>
+            <a href="#wallet" class="admin-nav-link">Гаманці</a>
+            <a href="#auctions" class="admin-nav-link">Аукціони</a>
+            <a href="#team" class="admin-nav-link">Команда</a>
+            <a href="#create" class="admin-nav-link">Новий аукціон</a>
+            <a href="#actions" class="admin-nav-link">Швидкі дії</a>
+          </nav>
+        </section>
+      </aside>
+      <div class="admin-content" id="admin-content-root">
+        <!-- Dynamic sections injected by admin.js -->
+      </div>
     </main>
-    <script type="module" src="js/pages/admin.js"></script>
+    <script type="module" src="js/pages/admin_refactored.js"></script>
   </body>
   </html>
