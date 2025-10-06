@@ -135,7 +135,6 @@
     text-align: right;
 }
 
-/* Depth bar cell (price column) */
 .market-book__block td.depth-cell {
     position: relative;
     text-align: left;
@@ -193,6 +192,19 @@
     font-weight: 600;
     margin: 0;
 }
+
+/* Micro chart (sparkline) styles */
+.market-metrics dd.metric-with-chart {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.market-metrics dd.metric-with-chart .metric-value {
+    white-space: nowrap;
+}
+.micro-chart { display: block; }
+.micro-chart__line { filter: drop-shadow(0 0 2px rgba(0,0,0,0.4)); }
+.micro-chart__area { opacity: 0.85; }
 
 .market-forms {
     display: grid;

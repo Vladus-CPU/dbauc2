@@ -124,7 +124,6 @@ function renderBook(book) {
   asksBody.innerHTML = '';
   const bidLevels = (book.book.bids || []).slice(0, 15);
   const askLevels = (book.book.asks || []).slice(0, 15);
-  // Find max cumulative for visual scaling (use side-specific cumulative)
   const maxBidCum = Math.max(...bidLevels.map(l => l.cumulativeQuantity || 0), 0);
   const maxAskCum = Math.max(...askLevels.map(l => l.cumulativeQuantity || 0), 0);
   bidLevels.forEach((level) => {
@@ -161,10 +160,28 @@ function renderBook(book) {
 
 function renderMetrics(book) {
   const m = book.metrics;
+  // Initialize / update local metric history for micro charts
+  const history = window.__auctionMetricHistory || (window.__auctionMetricHistory = {
+    spread: [],
+    midPrice: [],
+    depthImbalancePct: [], // stored as percent value
+    lastClearingPrice: []
+  });
+  const pushMetric = (key, val) => {
+    if (typeof val === 'number' && isFinite(val)) {
+      history[key].push(val);
+      if (history[key].length > 120) history[key].shift(); // keep last ~120 samples
+    }
+  };
+  pushMetric('spread', m.spread);
+  pushMetric('midPrice', m.midPrice);
+  pushMetric('depthImbalancePct', typeof m.depthImbalance === 'number' ? m.depthImbalance * 100 : NaN);
+  pushMetric('lastClearingPrice', m.lastClearingPrice);
+
   metricsEl.innerHTML = '';
   const rows = [
-    ['Спред', m.spread],
-    ['Середня (mid) ціна', m.midPrice],
+    ['Спред', m.spread, 'spread'],
+    ['Середня (mid) ціна', m.midPrice, 'midPrice'],
     ['Обсяг купівлі', m.totalBidQuantity],
     ['Обсяг продажу', m.totalAskQuantity],
     ['Заявок (bid)', m.bidOrderCount],
@@ -177,8 +194,8 @@ function renderMetrics(book) {
     ['Top3 глибина ask', m.top3AskDepth],
     ['Top3 ордерів bid', m.top3BidOrders],
     ['Top3 ордерів ask', m.top3AskOrders],
-    ['Дисбаланс глибини', typeof m.depthImbalance === 'number' ? (m.depthImbalance * 100) : m.depthImbalance],
-    ['Остання ціна клірингу', m.lastClearingPrice],
+    ['Дисбаланс глибини', typeof m.depthImbalance === 'number' ? (m.depthImbalance * 100) : m.depthImbalance, 'depthImbalancePct'],
+    ['Остання ціна клірингу', m.lastClearingPrice, 'lastClearingPrice'],
     ['Останній обсяг клірингу', m.lastClearingQuantity],
   ];
   const formatValue = (label, value) => {
@@ -188,11 +205,46 @@ function renderMetrics(book) {
     if (typeof value === 'string' && value.trim() === '') return '—';
     return value;
   };
-  rows.forEach(([label, value]) => {
+  const chartable = new Set(['spread','midPrice','depthImbalancePct','lastClearingPrice']);
+
+  function buildSparkline(data, { width = 70, height = 22, stroke = '#66c0f4', fill = 'rgba(102,192,244,0.18)' } = {}) {
+    if (!data || data.length < 2) {
+      return `<svg class="micro-chart" width="${width}" height="${height}" aria-hidden="true"></svg>`;
+    }
+    const slice = data.slice(-40); // last 40 points
+    const min = Math.min(...slice);
+    const max = Math.max(...slice);
+    const span = max - min || 1;
+    const pts = slice.map((v, i) => {
+      const x = (i / (slice.length - 1)) * (width - 2) + 1;
+      const y = height - 2 - ((v - min) / span) * (height - 4);
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    }).join(' ');
+    const area = `M1 ${height-1} L ${pts.replace(/ /g,' L ')} L ${width-1} ${height-1} Z`;
+    return `<svg class="micro-chart" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-hidden="true" preserveAspectRatio="none">
+      <path class="micro-chart__area" d="${area}" fill="${fill}" stroke="none" />
+      <polyline class="micro-chart__line" points="${pts}" fill="none" stroke="${stroke}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" />
+    </svg>`;
+  }
+
+  rows.forEach(([label, value, key]) => {
     const dt = document.createElement('dt');
     dt.textContent = label;
     const dd = document.createElement('dd');
-    dd.textContent = formatValue(label, value);
+    if (key && chartable.has(key)) {
+      const display = formatValue(label, value);
+      let histKey = key;
+      // unify mapping for depthImbalancePct
+      if (key === 'depthImbalancePct') histKey = 'depthImbalancePct';
+      const spark = buildSparkline(history[histKey], {
+        stroke: key === 'depthImbalancePct' ? '#ff9393' : (key === 'spread' ? '#7ee787' : '#66c0f4'),
+        fill: key === 'depthImbalancePct' ? 'rgba(255,105,97,0.18)' : 'rgba(102,192,244,0.18)'
+      });
+      dd.classList.add('metric-with-chart');
+      dd.innerHTML = `<span class="metric-value">${display}</span>${spark}`;
+    } else {
+      dd.textContent = formatValue(label, value);
+    }
     metricsEl.append(dt, dd);
   });
 }
