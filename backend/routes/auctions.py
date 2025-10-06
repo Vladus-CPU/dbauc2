@@ -187,6 +187,20 @@ def auction_order_book(auction_id: int):
         spread = None
         if best_bid_dec is not None and best_ask_dec is not None:
             spread = float((best_ask_dec - best_bid_dec).quantize(DECIMAL_QUANT))
+        # Mid price (average of best bid / ask) and depth metrics
+        mid_price = None
+        if best_bid_dec is not None and best_ask_dec is not None:
+            try:
+                mid_price = float(((best_bid_dec + best_ask_dec) / Decimal('2')).quantize(DECIMAL_QUANT))
+            except Exception:
+                mid_price = float((best_bid_dec + best_ask_dec) / 2)
+        best_bid_depth = bid_levels[0]['totalQuantity'] if bid_levels else None
+        best_ask_depth = ask_levels[0]['totalQuantity'] if ask_levels else None
+        best_bid_orders_level = bid_levels[0]['orderCount'] if bid_levels else None
+        best_ask_orders_level = ask_levels[0]['orderCount'] if ask_levels else None
+        depth_imbalance = None
+        if isinstance(best_bid_depth, float) and isinstance(best_ask_depth, float) and (best_bid_depth + best_ask_depth) > 0:
+            depth_imbalance = (best_bid_depth - best_ask_depth) / (best_bid_depth + best_ask_depth)
 
         cur.execute(
             "SELECT id, trader_id, side, price, quantity, created_at, cleared_price, cleared_quantity "
@@ -209,10 +223,16 @@ def auction_order_book(auction_id: int):
             "bestBid": best_bid,
             "bestAsk": best_ask,
             "spread": spread,
+            "midPrice": mid_price,
             "totalBidQuantity": float(total_bid_qty),
             "totalAskQuantity": float(total_ask_qty),
             "bidOrderCount": len(bid_orders),
             "askOrderCount": len(ask_orders),
+            "bestBidDepth": best_bid_depth,
+            "bestAskDepth": best_ask_depth,
+            "bestBidOrders": best_bid_orders_level,
+            "bestAskOrders": best_ask_orders_level,
+            "depthImbalance": depth_imbalance,
             "lastClearingPrice": cleared_entries[0]['price'] if cleared_entries else None,
             "lastClearingQuantity": cleared_entries[0]['quantity'] if cleared_entries else None,
         }

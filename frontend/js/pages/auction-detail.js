@@ -157,16 +157,24 @@ function renderMetrics(book) {
   metricsEl.innerHTML = '';
   const rows = [
     ['Спред', m.spread],
+    ['Середня (mid) ціна', m.midPrice],
     ['Обсяг купівлі', m.totalBidQuantity],
     ['Обсяг продажу', m.totalAskQuantity],
     ['Заявок (bid)', m.bidOrderCount],
     ['Заявок (ask)', m.askOrderCount],
+    ['Глибина на найкращому bid', m.bestBidDepth],
+    ['Глибина на найкращому ask', m.bestAskDepth],
+    ['Ордерів @ найк. bid', m.bestBidOrders],
+    ['Ордерів @ найк. ask', m.bestAskOrders],
+    ['Дисбаланс глибини', typeof m.depthImbalance === 'number' ? (m.depthImbalance * 100) : m.depthImbalance],
     ['Остання ціна клірингу', m.lastClearingPrice],
     ['Останній обсяг клірингу', m.lastClearingQuantity],
   ];
   const formatValue = (value) => {
     if (value === null || value === undefined) return '—';
     if (typeof value === 'number') return formatNumber(value);
+    // Show % sign for imbalance if already converted to number percent
+    if (label.includes('Дисбаланс') && typeof value === 'number') return `${formatNumber(value, { maximumFractionDigits: 2 })}%`;
     if (typeof value === 'string' && value.trim() === '') return '—';
     return value;
   };
@@ -385,7 +393,6 @@ async function load() {
     renderOrdersList(book);
     renderClearing(book);
     renderForms(book, me, participation);
-    // Stop auto-refresh if auction closed
     try {
       if (book?.auction?.status && book.auction.status !== 'collecting') {
         if (window.__auctionRefreshTimer) {
@@ -410,7 +417,6 @@ refreshBtn.addEventListener('click', () => {
 document.addEventListener('DOMContentLoaded', async () => {
   await initAccessControl();
   await load();
-  // Lightweight auto-refresh while collecting, every 15s, skip when tab hidden
   if (!window.__auctionRefreshTimer) {
     window.__auctionRefreshTimer = setInterval(() => {
       if (document.hidden) return;
