@@ -1,0 +1,6 @@
+/* Metrics tiles & grids */
+.metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-top: 16px; }
+.metrics-tile { background: rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:6px; min-height:112px; }
+.metrics-tile__value { font-size:clamp(1.75rem,2.2vw,2.4rem); font-weight:600; color:var(--text-primary,#fff); }
+.metrics-tile__label { font-size:0.95rem; font-weight:500; color:var(--text-secondary,rgba(255,255,255,0.8)); text-transform:uppercase; letter-spacing:0.04em; }
+.metrics-tile__meta { font-size:0.85rem; color:var(--text-muted,rgba(255,255,255,0.6)); }

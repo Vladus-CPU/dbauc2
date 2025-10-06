@@ -1,0 +1,16 @@
+/* Wallet page styles */
+.wallet-container { display:grid; gap:24px; margin-bottom:48px; }
+.wallet-users-list, .wallet-controls, .wallet-transactions { margin-top:16px; }
+.wallet-controls { display:grid; gap:12px; }
+.wallet-controls__row { display:flex; gap:12px; flex-wrap:wrap; }
+.wallet-action-form { display:flex; flex-wrap:wrap; gap:10px; }
+.wallet-action-form .field { flex:1 1 140px; min-width:140px; }
+.wallet-action-form button { align-self:center; }
+.wallet-transactions .data-list__item { align-items:center; }
+.wallet-forms-grid { display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
+.wallet-form { display:grid; gap:12px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:16px; }
+.wallet-form__title { font-size:1.1rem; font-weight:600; }
+.wallet-form__subtitle { font-size:0.9rem; color:var(--text-muted,rgba(255,255,255,0.65)); }
+.wallet-tips { margin-top:20px; background:rgba(255,255,255,0.03); border:1px dashed rgba(255,255,255,0.12); border-radius:12px; padding:16px; display:grid; gap:8px; }
+.wallet-tips__title { font-weight:600; }
+.wallet-tips__list { margin:0; padding-left:18px; display:grid; gap:6px; font-size:0.9rem; }
