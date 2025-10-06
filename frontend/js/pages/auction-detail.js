@@ -595,4 +595,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       window.__auctionRefreshTimer = null;
     }
   });
+
+  // Tabs logic
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const panels = document.querySelectorAll('.tab-panel');
+  tabButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.classList.contains('is-active')) return;
+      tabButtons.forEach(b=>b.classList.remove('is-active'));
+      panels.forEach(p=>p.classList.remove('is-active'));
+      btn.classList.add('is-active');
+      const id = btn.getAttribute('data-tab-target');
+      const panel = document.getElementById(id);
+      if (panel) panel.classList.add('is-active');
+      // Trigger refresh for distribution/history when switching to that tab
+      if (id === 'tab-distribution') {
+        updateHistoryCharts();
+        updatePriceDistribution();
+      }
+    });
+  });
 });
