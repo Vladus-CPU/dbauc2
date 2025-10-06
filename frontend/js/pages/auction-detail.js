@@ -163,93 +163,64 @@ function renderBook(book) {
 
 function renderMetrics(book) {
   const m = book.metrics;
-  const history = window.__auctionMetricHistory || (window.__auctionMetricHistory = {
-    spread: [],
-    midPrice: [],
-    depthImbalancePct: [],
-    lastClearingPrice: []
-  });
-  const pushMetric = (key, val) => {
-    if (typeof val === 'number' && isFinite(val)) {
-      history[key].push(val);
-      if (history[key].length > 120) history[key].shift();
-    }
-  };
-  pushMetric('spread', m.spread);
-  pushMetric('midPrice', m.midPrice);
-  pushMetric('depthImbalancePct', typeof m.depthImbalance === 'number' ? m.depthImbalance * 100 : NaN);
-  pushMetric('lastClearingPrice', m.lastClearingPrice);
+  const h = window.__auctionMetricHistory || (window.__auctionMetricHistory = { spread:[], midPrice:[], depthImbalancePct:[], lastClearingPrice:[] });
+  const push = (k,v)=>{ if (typeof v==='number' && isFinite(v)){ h[k].push(v); if (h[k].length>150) h[k].shift(); } };
+  push('spread', m.spread); push('midPrice', m.midPrice); push('depthImbalancePct', typeof m.depthImbalance==='number'? m.depthImbalance*100:NaN); push('lastClearingPrice', m.lastClearingPrice);
 
+  const sparkBar = (arr, {stroke='#66c0f4'}={}) => {
+    if (!arr || arr.length<3) return '';
+    const slice = arr.slice(-40);
+    const min = Math.min(...slice), max = Math.max(...slice), span = max-min||1;
+    const pts = slice.map((v,i)=>{
+      const x = (i/(slice.length-1))*100;
+      const y = 100 - ((v-min)/span)*100;
+      return `${x.toFixed(2)},${y.toFixed(2)}`; }).join(' ');
+    return `<svg viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  };
+  const fmt = (val, {pct=false}={}) => {
+    if (val===null || val===undefined || Number.isNaN(val)) return '—';
+    if (pct) return `${formatNumber(val,{maximumFractionDigits:2})}%`;
+    if (typeof val==='number') return formatNumber(val);
+    return val;
+  };
   metricsEl.innerHTML = '';
-  const rows = [
-    ['Спред', m.spread, 'spread'],
-    m.isCrossedMarket ? ['⚠️ Перехрещений ринок', 'так'] : null,
-    ['Середня (mid) ціна', m.midPrice, 'midPrice'],
-    ['Обсяг купівлі', m.totalBidQuantity],
-    ['Обсяг продажу', m.totalAskQuantity],
-    ['Заявок (bid)', m.bidOrderCount],
-    ['Заявок (ask)', m.askOrderCount],
-    ['Глибина на найкращому bid', m.bestBidDepth],
-    ['Глибина на найкращому ask', m.bestAskDepth],
-    ['Ордерів @ найк. bid', m.bestBidOrders],
-    ['Ордерів @ найк. ask', m.bestAskOrders],
-    ['Top3 глибина bid', m.top3BidDepth],
-    ['Top3 глибина ask', m.top3AskDepth],
-    ['Top3 ордерів bid', m.top3BidOrders],
-    ['Top3 ордерів ask', m.top3AskOrders],
-    ['Дисбаланс глибини', typeof m.depthImbalance === 'number' ? (m.depthImbalance * 100) : m.depthImbalance, 'depthImbalancePct'],
-    ['Остання ціна клірингу', m.lastClearingPrice, 'lastClearingPrice'],
-    ['Останній обсяг клірингу', m.lastClearingQuantity],
+  const wrap = document.createElement('div'); wrap.className='metrics-tiles';
+  // Primary tiles
+  const grid = document.createElement('div'); grid.className='metrics-tiles__grid';
+  const tiles = [
+    {k:'spread', label:'Спред', value:fmt(m.spread), spark:sparkBar(h.spread,{stroke:'#7ee787'}), cls:(m.spread<0?'negative':'positive')},
+    {k:'mid', label:'Mid ціна', value:fmt(m.midPrice), spark:sparkBar(h.midPrice,{stroke:'#66c0f4'})},
+    {k:'depthImb', label:'Дисбаланс', value:fmt(typeof m.depthImbalance==='number'?m.depthImbalance*100:NaN,{pct:true}), spark:sparkBar(h.depthImbalancePct,{stroke:'#ff9393'}), cls: (m.depthImbalance>0?'positive':'negative')},
+    {k:'lastClr', label:'Clearing ціна', value:fmt(m.lastClearingPrice), spark:sparkBar(h.lastClearingPrice,{stroke:'#cfa8ff'})},
+    {k:'totBid', label:'Обсяг bid', value:fmt(m.totalBidQuantity)},
+    {k:'totAsk', label:'Обсяг ask', value:fmt(m.totalAskQuantity)},
+    {k:'ordersBid', label:'Ордерів bid', value:fmt(m.bidOrderCount)},
+    {k:'ordersAsk', label:'Ордерів ask', value:fmt(m.askOrderCount)}
   ];
-  const formatValue = (label, value) => {
-    if (value === null || value === undefined) return '—';
-    if (label.includes('Дисбаланс') && typeof value === 'number') return `${formatNumber(value, { maximumFractionDigits: 2 })}%`;
-    if (typeof value === 'number') return formatNumber(value);
-    if (typeof value === 'string' && value.trim() === '') return '—';
-    return value;
-  };
-  const chartable = new Set(['spread','midPrice','depthImbalancePct','lastClearingPrice']);
-
-  function buildSparkline(data, { width = 70, height = 22, stroke = '#66c0f4', fill = 'rgba(102,192,244,0.18)' } = {}) {
-    if (!data || data.length < 2) {
-      return `<svg class="micro-chart" width="${width}" height="${height}" aria-hidden="true"></svg>`;
-    }
-    const slice = data.slice(-40); // last 40 points
-    const min = Math.min(...slice);
-    const max = Math.max(...slice);
-    const span = max - min || 1;
-    const pts = slice.map((v, i) => {
-      const x = (i / (slice.length - 1)) * (width - 2) + 1;
-      const y = height - 2 - ((v - min) / span) * (height - 4);
-      return `${x.toFixed(2)},${y.toFixed(2)}`;
-    }).join(' ');
-    const area = `M1 ${height-1} L ${pts.replace(/ /g,' L ')} L ${width-1} ${height-1} Z`;
-    return `<svg class="micro-chart" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" aria-hidden="true" preserveAspectRatio="none">
-      <path class="micro-chart__area" d="${area}" fill="${fill}" stroke="none" />
-      <polyline class="micro-chart__line" points="${pts}" fill="none" stroke="${stroke}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" />
-    </svg>`;
-  }
-
-  rows.filter(Boolean).forEach(([label, value, key]) => {
-    const dt = document.createElement('dt');
-    dt.textContent = label;
-    const dd = document.createElement('dd');
-    if (key && chartable.has(key)) {
-      const display = formatValue(label, value);
-      let histKey = key;
-      // unify mapping for depthImbalancePct
-      if (key === 'depthImbalancePct') histKey = 'depthImbalancePct';
-      const spark = buildSparkline(history[histKey], {
-        stroke: key === 'depthImbalancePct' ? '#ff9393' : (key === 'spread' ? '#7ee787' : '#66c0f4'),
-        fill: key === 'depthImbalancePct' ? 'rgba(255,105,97,0.18)' : 'rgba(102,192,244,0.18)'
-      });
-      dd.classList.add('metric-with-chart');
-      dd.innerHTML = `<span class="metric-value">${display}</span>${spark}`;
-    } else {
-      dd.textContent = formatValue(label, value);
-    }
-    metricsEl.append(dt, dd);
+  tiles.forEach(t=>{
+    const div = document.createElement('div'); div.className='metric-tile'+(t.cls?(' '+t.cls):'');
+    div.innerHTML = `<div class="metric-tile__label">${t.label}</div><div class="metric-tile__value">${t.value}</div>${t.spark?`<div class="metric-tile__spark">${t.spark}</div>`:''}`;
+    grid.appendChild(div);
   });
+  wrap.appendChild(grid);
+  // Toggle & extra metrics
+  const toggle = document.createElement('button'); toggle.type='button'; toggle.className='metrics-more-toggle'; toggle.textContent='Додаткові метрики';
+  const extra = document.createElement('div'); extra.className='metrics-extra hidden';
+  const extraList = [
+    ['Best bid depth', m.bestBidDepth], ['Best ask depth', m.bestAskDepth],
+    ['Orders @ best bid', m.bestBidOrders], ['Orders @ best ask', m.bestAskOrders],
+    ['Top3 bid depth', m.top3BidDepth], ['Top3 ask depth', m.top3AskDepth],
+    ['Top3 bid orders', m.top3BidOrders], ['Top3 ask orders', m.top3AskOrders],
+    ['Clearing qty', m.lastClearingQuantity]
+  ];
+  const dl = document.createElement('dl');
+  extraList.forEach(([lab,val])=>{
+    const dt=document.createElement('dt'); dt.textContent=lab; const dd=document.createElement('dd'); dd.textContent=fmt(val); dl.append(dt,dd);
+  });
+  extra.appendChild(dl);
+  toggle.addEventListener('click',()=>{ extra.classList.toggle('hidden'); toggle.textContent = extra.classList.contains('hidden') ? 'Додаткові метрики' : 'Приховати метрики'; });
+  wrap.append(toggle, extra);
+  metricsEl.appendChild(wrap);
 }
 
 // --------- History (price & depth) ---------
