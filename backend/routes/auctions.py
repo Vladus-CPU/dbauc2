@@ -211,6 +211,32 @@ def auction_order_book(auction_id: int):
         depth_imbalance = None
         if isinstance(best_bid_depth, float) and isinstance(best_ask_depth, float) and (best_bid_depth + best_ask_depth) > 0:
             depth_imbalance = (best_bid_depth - best_ask_depth) / (best_bid_depth + best_ask_depth)
+        # ---- Adaptive k (feedback) ----
+        # Use current stored k_value as baseline; adjust toward bid or ask side when imbalance present.
+        # Positive depth_imbalance => bids heavier => shift k down (toward 0) to slightly favor asks.
+        # Negative imbalance => asks heavier => shift k up (toward 1) to favor bids.
+        adaptive_k = None
+        try:
+            base_k = to_decimal(auction['k_value']) if auction.get('k_value') is not None else Decimal('0.5')
+            if depth_imbalance is not None:
+                alpha = Decimal('0.15')  # sensitivity factor (tunable)
+                adj = Decimal(str(depth_imbalance)) * alpha
+                candidate = base_k - adj  # subtract because positive imbalance (more bids) should lower k
+                if candidate < Decimal('0'): candidate = Decimal('0')
+                if candidate > Decimal('1'): candidate = Decimal('1')
+                adaptive_k = float(candidate)
+                # Optional persistence: only write back if difference > 0.01 to reduce churn
+                if abs(candidate - base_k) >= Decimal('0.01'):
+                    try:
+                        cur.execute("UPDATE auctions SET k_value=%s WHERE id=%s", (str(candidate), auction_id))
+                        conn.commit()
+                        auction['k_value'] = str(candidate)
+                    except Exception:
+                        conn.rollback()
+            else:
+                adaptive_k = float(base_k)
+        except Exception:
+            adaptive_k = None
         top_n = 3
         cum_bid_depth = sum((lvl['totalQuantity'] for lvl in bid_levels[:top_n]), 0.0) if bid_levels else None
         cum_ask_depth = sum((lvl['totalQuantity'] for lvl in ask_levels[:top_n]), 0.0) if ask_levels else None
@@ -255,6 +281,9 @@ def auction_order_book(auction_id: int):
             "top3AskOrders": cum_ask_orders,
             "lastClearingPrice": cleared_entries[0]['price'] if cleared_entries else None,
             "lastClearingQuantity": cleared_entries[0]['quantity'] if cleared_entries else None,
+            "kValue": float(auction['k_value']) if auction.get('k_value') is not None else None,
+            "adaptiveK": adaptive_k,
+            "adaptiveKAlpha": 0.15,
         }
 
         recent_bid_orders = sorted(bid_orders, key=lambda o: (o['price'], o['created_at']), reverse=True)[:10]
