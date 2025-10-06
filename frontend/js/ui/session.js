@@ -113,7 +113,7 @@ async function resolveSession(options = {}) {
             cacheTimestamp = Date.now();
             return cloneSession(session);
         } catch (error) {
-            console.warn('Failed to fetch session info', error);
+            console.warn('Не вдалося завантажити інформацію про сесію', error);
             cachedSession = createGuestSession();
             cachedSession.error = error;
             cacheTimestamp = Date.now();
@@ -148,7 +148,7 @@ export async function initAccessControl(options = {}) {
         session = await resolveSession({ forceRefresh: settings.forceRefresh });
     } catch (error) {
         if (!settings.suppressErrors) {
-            console.error('Failed to initialize access control', error);
+            console.error('Не вдалося ініціалізувати контроль доступу', error);
         }
         session = createGuestSession();
     }
@@ -170,7 +170,7 @@ export async function initAccessControl(options = {}) {
             try {
                 settings.onDenied(session);
             } catch (callbackError) {
-                console.error('onDenied callback threw an error', callbackError);
+                console.error('зворотний виклик onDenied викликав помилку', callbackError);
             }
         }
         if (settings.redirectTo && typeof window !== 'undefined') {
@@ -182,7 +182,7 @@ export async function initAccessControl(options = {}) {
                     window.location.href = resolvedTarget;
                 }
             } catch (navigationError) {
-                console.error('Failed to redirect after access denial', navigationError);
+                console.error('Не вдалося перенаправити після відмови в доступі', navigationError);
             }
         }
     }

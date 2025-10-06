@@ -1,10 +1,4 @@
-import {
-  getAuctionBook,
-  getMe,
-  joinAuction,
-  myParticipationStatus,
-  placeAuctionOrder,
-} from '../api.js';
+import {getAuctionBook, getMe, joinAuction, myParticipationStatus, placeAuctionOrder,} from '../api.js';
 import { showToast } from '../ui/toast.js';
 import { initAccessControl } from '../ui/session.js';
 
@@ -61,9 +55,9 @@ function formatDate(value) {
 function renderSummary(book) {
   const { auction } = book;
   titleEl.textContent = `${auction.product}`;
-  statusEl.textContent = auction.status;
+  statusEl.textContent = tStatus(auction.status);
   statusEl.className = `pill status-${auction.status}`;
-  document.title = `${auction.product} · Auction order book`;
+  document.title = `${auction.product} · Книга заявок аукціону`;
 
   const meta = [];
   meta.push(`<span><strong>Тип:</strong> ${auction.type}</span>`);
@@ -87,11 +81,11 @@ function renderSummary(book) {
     best.className = 'market-summary__quote';
     best.innerHTML = `
       <div>
-        <span class="muted">Best bid</span>
+        <span class="muted">Найкраща купівля</span>
         <strong>${formatPrice(metrics.bestBid)}</strong>
       </div>
       <div>
-        <span class="muted">Best ask</span>
+        <span class="muted">Найкращий продаж</span>
         <strong>${formatPrice(metrics.bestAsk)}</strong>
       </div>
     `;
@@ -136,13 +130,13 @@ function renderMetrics(book) {
   const m = book.metrics;
   metricsEl.innerHTML = '';
   const rows = [
-    ['Spread', m.spread],
-    ['Bid volume', m.totalBidQuantity],
-    ['Ask volume', m.totalAskQuantity],
-    ['Bid orders', m.bidOrderCount],
-    ['Ask orders', m.askOrderCount],
-    ['Last clearing price', m.lastClearingPrice],
-    ['Last clearing volume', m.lastClearingQuantity],
+    ['Спред', m.spread],
+    ['Обсяг купівлі', m.totalBidQuantity],
+    ['Обсяг продажу', m.totalAskQuantity],
+    ['Заявок (bid)', m.bidOrderCount],
+    ['Заявок (ask)', m.askOrderCount],
+    ['Остання ціна клірингу', m.lastClearingPrice],
+    ['Останній обсяг клірингу', m.lastClearingQuantity],
   ];
   rows.forEach(([label, value]) => {
     const dt = document.createElement('dt');
@@ -165,8 +159,9 @@ function renderOrdersList(book) {
   });
   combined.slice(0, 12).forEach((order) => {
     const li = document.createElement('li');
+    const sideLabel = tSide(order.side).toUpperCase();
     li.innerHTML = `
-      <div><strong>${order.side === 'bid' ? 'BUY' : 'SELL'}</strong> ${formatQty(order.quantity)} @ ${formatPrice(order.price)}</div>
+      <div><strong>${sideLabel}</strong> ${formatQty(order.quantity)} @ ${formatPrice(order.price)}</div>
       <span>${formatDate(order.createdAt)}</span>
     `;
     recentOrdersEl.append(li);
@@ -278,7 +273,7 @@ function renderForms(book, me, participation) {
           showToast('Запит на участь відправлено', 'success');
           await load();
         } catch (error) {
-          showToast(error?.message || 'Не вдалося подати заявку', 'error');
+          showToast(localizeErrorMessage(error?.message || 'Не вдалося подати заявку'), 'error');
         }
       });
       formsEl.append(form);
@@ -333,7 +328,7 @@ function renderForms(book, me, participation) {
       orderForm.reset();
       await load();
     } catch (error) {
-      showToast(error?.message || 'Не вдалося подати ордер', 'error');
+  showToast(localizeErrorMessage(error?.message || 'Не вдалося подати ордер'), 'error');
     }
   });
   formsEl.append(orderForm);
@@ -359,7 +354,7 @@ async function load() {
     renderClearing(book);
     renderForms(book, me, participation);
   } catch (error) {
-    summaryEl.innerHTML = `<p class="error">${error?.message || 'Не вдалося завантажити аукціон'}</p>`;
+  summaryEl.innerHTML = `<p class="error">${localizeErrorMessage(error?.message || 'Не вдалося завантажити аукціон')}</p>`;
     console.error(error);
   } finally {
     summaryEl.classList.remove('is-loading');

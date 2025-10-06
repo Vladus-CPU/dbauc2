@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Auction Order Book</title>
+    <title>Книга ордерів аукціону</title>
     <link rel="stylesheet" href="css/backgroundstyle.css" />
     <link rel="stylesheet" href="css/style.css" />
     <link rel="stylesheet" href="css/auction-detail.css" />
@@ -12,20 +12,20 @@
     <header class="site-header market-header">
       <div class="logo">
         <div class="title-wrap">
-          <h1 class="site-title">Auction House</h1>
+          <h1 class="site-title">Аукціонний дім</h1>
           <span class="site-description">Подвійний аукціон — книга заявок</span>
         </div>
       </div>
       <nav>
-        <a href="index.html" class="nav-link">Home</a>
+        <a href="index.html" class="nav-link">Головна</a>
         <a href="listing.html" class="nav-link nav-link--internal" data-role-required="admin">
-          <span>Inventory</span>
-          <span class="badge badge--outline">INTERNAL</span>
+          <span>Інвентар</span>
+          <span class="badge badge--outline">ВНУТРІШНЄ</span>
         </a>
-        <a href="auctions.html" class="nav-link">Auctions</a>
-        <a href="wallet.html" class="nav-link" data-role-required="auth">Wallet</a>
-        <a href="account.html" class="nav-link">Profile</a>
-        <a href="admin.html" class="nav-link" data-role-required="admin">Admin</a>
+        <a href="auctions.html" class="nav-link">Аукціони</a>
+        <a href="wallet.html" class="nav-link" data-role-required="auth">Гаманець</a>
+        <a href="account.html" class="nav-link">Профіль</a>
+        <a href="admin.html" class="nav-link" data-role-required="admin">Адмін</a>
       </nav>
     </header>
     <main class="market-container">
@@ -46,12 +46,12 @@
       <section class="market-grid">
         <article class="card market-panel">
           <header class="market-panel__header">
-            <h3>Order book</h3>
+            <h3>Книга ордерів</h3>
             <button class="btn btn-ghost" id="refresh-book">Оновити</button>
           </header>
           <div class="market-book" id="market-book">
             <div class="market-book__block">
-              <h4>Buy orders</h4>
+              <h4>Заявки на купівлю</h4>
               <table>
                 <thead>
                   <tr>
@@ -65,7 +65,7 @@
               </table>
             </div>
             <div class="market-book__block">
-              <h4>Sell orders</h4>
+              <h4>Заявки на продаж</h4>
               <table>
                 <thead>
                   <tr>
@@ -109,7 +109,7 @@
     </main>
     <footer class="site-footer-main">
       <div class="footer-content">
-        <p>&copy; 2025 Auction House. All rights reserved.</p>
+        <p>&copy; 2025 Аукціонний дім. Усі права захищені.</p>
       </div>
     </footer>
     <script type="module" src="js/pages/auction-detail.js"></script>

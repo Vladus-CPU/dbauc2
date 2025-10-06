@@ -71,7 +71,7 @@ export async function getListings(options = {}) {
         try {
             response = await authorizedFetch(`/api/listings${query}`);
         } catch (networkError) {
-            console.warn('API listings fetch fallback', networkError);
+            console.warn('Резервний варіант завантаження списків API', networkError);
         }
         if (!response || !response.ok) {
             response = await fetch(`${API_BASE_URL}/listings${query}`);
@@ -93,7 +93,7 @@ export async function getListings(options = {}) {
         }
         return data;
     } catch (error) {
-        console.error('Failed to fetch listings:', error);
+        console.error('Не вдалося завантажити лоти:', error);
         if (detailed) throw error;
         return [];
     }
@@ -109,7 +109,7 @@ export async function getListingSummary(options = {}) {
         try {
             response = await authorizedFetch(`/api/listings/summary${query}`);
         } catch (networkError) {
-            console.warn('API listings summary fetch fallback', networkError);
+            console.warn('Резервний варіант завантаження зведення по лотах API', networkError);
         }
         if (!response || !response.ok) {
             response = await fetch(`${API_BASE_URL}/listings/summary${query}`);
@@ -119,7 +119,7 @@ export async function getListingSummary(options = {}) {
         }
         return await response.json();
     } catch (error) {
-        console.error('Failed to fetch listings summary:', error);
+        console.error('Не вдалося завантажити зведення по лотах:', error);
         throw error;
     }
 }
@@ -133,11 +133,11 @@ export async function createListing(data) {
         });
         if (!response.ok) {
             const text = await response.text();
-            throw new Error(`Create listing failed: ${response.status} ${text}`);
+            throw new Error(`Не вдалося створити лот: ${response.status} ${text}`);
         }
         return await response.json();
     } catch (error) {
-        console.error('Failed to create listing:', error);
+        console.error('Не вдалося створити лот:', error);
         throw error;
     }
 }
@@ -146,7 +146,7 @@ export async function getListingById(listingId) {
     const res = await authorizedFetch(`/api/listings/${listingId}`);
     if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`Get listing failed: ${res.status} ${txt}`);
+        throw new Error(`Не вдалося отримати лот: ${res.status} ${txt}`);
     }
     return res.json();
 }
@@ -159,7 +159,7 @@ export async function updateListing(listingId, payload) {
     });
     if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`Update listing failed: ${res.status} ${txt}`);
+        throw new Error(`Не вдалося оновити лот: ${res.status} ${txt}`);
     }
     return res.json();
 }
@@ -172,7 +172,7 @@ export async function patchListing(listingId, payload) {
     });
     if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`Patch listing failed: ${res.status} ${txt}`);
+        throw new Error(`Не вдалося частково оновити лот: ${res.status} ${txt}`);
     }
     return res.json();
 }
@@ -181,7 +181,7 @@ export async function deleteListing(listingId) {
     const res = await authorizedFetch(`/api/listings/${listingId}`, { method: 'DELETE' });
     if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`Delete listing failed: ${res.status} ${txt}`);
+        throw new Error(`Не вдалося видалити лот: ${res.status} ${txt}`);
     }
     return res.json();
 }
@@ -207,7 +207,7 @@ export async function registerUser(payload) {
     });
     if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`Register failed: ${res.status} ${txt}`);
+        throw new Error(`Помилка реєстрації: ${res.status} ${txt}`);
     }
     return res.json();
 }
@@ -220,7 +220,7 @@ export async function loginUser({ username, password, remember = true }) {
     });
     if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`Login failed: ${res.status} ${txt}`);
+        throw new Error(`Помилка входу: ${res.status} ${txt}`);
     }
     const data = await res.json();
     if (data?.token) setToken(data.token, remember);
@@ -236,14 +236,14 @@ export async function getMe() {
                 authenticated: false 
             };
         }
-        throw new Error(`Me failed: ${res.status}`);
+        throw new Error(`Помилка отримання даних користувача: ${res.status}`);
     }
     return res.json();
 }
 
 export async function getMyProfile() {
     const res = await authorizedFetch('/api/me/profile');
-    if (!res.ok) throw new Error(`Get profile failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Не вдалося отримати профіль: ${res.status}`);
     return res.json();
 }
 
@@ -255,7 +255,7 @@ export async function updateMyProfile(payload) {
     });
     if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`Update profile failed: ${res.status} ${txt}`);
+        throw new Error(`Не вдалося оновити профіль: ${res.status} ${txt}`);
     }
     return res.json();
 }
@@ -266,13 +266,13 @@ export async function listAuctions({ status, type } = {}) {
     if (type) params.set('type', type);
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const res = await fetch(resolveApiUrl(`/api/auctions${suffix}`));
-    if (!res.ok) throw new Error(`List auctions failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Не вдалося отримати список аукціонів: ${res.status}`);
     return res.json();
 }
 
 export async function getAuctionBook(auctionId) {
     const res = await fetch(resolveApiUrl(`/api/auctions/${auctionId}/book`));
-    if (!res.ok) throw new Error(`Get auction book failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Не вдалося отримати книгу заявок аукціону: ${res.status}`);
     return res.json();
 }
 
@@ -294,7 +294,7 @@ export async function closeAuction(auctionId) {
     const res = await authorizedFetch(`/api/admin/auctions/${auctionId}/close`, {
         method: 'PATCH'
     });
-    if (!res.ok) throw new Error(`Close auction failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Не вдалося закрити аукціон: ${res.status}`);
     return res.json();
 }
 
@@ -304,14 +304,14 @@ export async function clearAuction(auctionId) {
     });
     if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`Clear auction failed: ${res.status} ${txt}`);
+        throw new Error(`Не вдалося провести кліринг аукціону: ${res.status} ${txt}`);
     }
     return res.json();
 }
 
 export async function listAccounts() {
     const res = await authorizedFetch('/api/accounts');
-    if (!res.ok) throw new Error(`List accounts failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Не вдалося отримати список рахунків: ${res.status}`);
     return res.json();
 }
 
@@ -321,19 +321,19 @@ export async function addAccount(accountNumber) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accountNumber })
     });
-    if (!res.ok) throw new Error(`Add account failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Не вдалося додати рахунок: ${res.status}`);
     return res.json();
 }
 
 export async function promoteUser(userId) {
     const res = await authorizedFetch(`/api/admin/users/${userId}/promote`, { method: 'POST' });
-    if (!res.ok) throw new Error(`Promote failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Не вдалося підвищити користувача: ${res.status}`);
     return res.json();
 }
 
 export async function demoteUser(userId) {
     const res = await authorizedFetch(`/api/admin/users/${userId}/demote`, { method: 'POST' });
-    if (!res.ok) throw new Error(`Demote failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Не вдалося понизити користувача: ${res.status}`);
     return res.json();
 }
 
@@ -341,7 +341,7 @@ export async function bootstrapAdmin() {
     const res = await authorizedFetch('/api/admin/bootstrap', { method: 'POST' });
     if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`Bootstrap admin failed: ${res.status} ${txt}`);
+        throw new Error(`Не вдалося ініціалізувати адміна: ${res.status} ${txt}`);
     }
     return res.json();
 }
@@ -354,14 +354,14 @@ export async function joinAuction(auctionId, accountId) {
     });
     if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`Join auction failed: ${res.status} ${txt}`);
+        throw new Error(`Не вдалося приєднатися до аукціону: ${res.status} ${txt}`);
     }
     return res.json();
 }
 
 export async function listParticipantsAdmin(auctionId) {
     const res = await authorizedFetch(`/api/admin/auctions/${auctionId}/participants`);
-    if (!res.ok) throw new Error(`List participants failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Не вдалося отримати список учасників: ${res.status}`);
     return res.json();
 }
 
@@ -369,7 +369,7 @@ export async function approveParticipant(auctionId, participantId) {
     const res = await authorizedFetch(`/api/admin/auctions/${auctionId}/participants/${participantId}/approve`, {
         method: 'PATCH'
     });
-    if (!res.ok) throw new Error(`Approve participant failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Не вдалося схвалити учасника: ${res.status}`);
     return res.json();
 }
 
@@ -381,26 +381,26 @@ export async function placeAuctionOrder(auctionId, { type, price, quantity }) {
     });
     if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`Place order failed: ${res.status} ${txt}`);
+        throw new Error(`Не вдалося розмістити ордер: ${res.status} ${txt}`);
     }
     return res.json();
 }
 
 export async function listAuctionOrdersAdmin(auctionId) {
     const res = await authorizedFetch(`/api/admin/auctions/${auctionId}/orders`);
-    if (!res.ok) throw new Error(`List auction orders failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Не вдалося отримати список ордерів аукціону: ${res.status}`);
     return res.json();
 }
 
 export async function myParticipationStatus(auctionId) {
     const res = await authorizedFetch(`/api/auctions/${auctionId}/participants/me`);
-    if (!res.ok) throw new Error(`Get participation failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Не вдалося отримати статус участі: ${res.status}`);
     return res.json();
 }
 
 export async function listResourceTransactions() {
     const res = await authorizedFetch('/api/resources/transactions');
-    if (!res.ok) throw new Error(`List transactions failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Не вдалося отримати список транзакцій: ${res.status}`);
     return res.json();
 }
 
@@ -410,7 +410,7 @@ export async function addResourceTransaction({ type, quantity, notes }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, quantity, notes })
     });
-    if (!res.ok) throw new Error(`Add transaction failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Не вдалося додати транзакцію: ${res.status}`);
     return res.json();
 }
 
@@ -419,7 +419,7 @@ export async function listResourceDocuments(options = {}) {
     if (options.traderId) params.set('traderId', options.traderId);
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const res = await authorizedFetch(`/api/resources/documents${suffix}`);
-    if (!res.ok) throw new Error(`List resource documents failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Не вдалося отримати список документів ресурсів: ${res.status}`);
     return res.json();
 }
 
@@ -433,20 +433,20 @@ export async function uploadResourceDocument({ file, note }) {
     });
     if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`Upload document failed: ${res.status} ${txt}`);
+        throw new Error(`Не вдалося завантажити документ: ${res.status} ${txt}`);
     }
     return res.json();
 }
 
 export async function listAdminUsers() {
     const res = await authorizedFetch('/api/admin/users');
-    if (!res.ok) throw new Error(`List users failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Не вдалося отримати список користувачів: ${res.status}`);
     return res.json();
 }
 
 export async function adminWalletSummary() {
     const res = await authorizedFetch('/api/admin/wallet');
-    if (!res.ok) throw new Error(`Admin wallet overview failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Огляд гаманця адміністратора не вдався: ${res.status}`);
     return res.json();
 }
 
@@ -458,7 +458,7 @@ export async function adminWalletAction(userId, { action, amount, note }) {
     });
     if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`Admin wallet action failed: ${res.status} ${txt}`);
+        throw new Error(`Дія з гаманцем адміністратора не вдалася: ${res.status} ${txt}`);
     }
     return res.json();
 }
@@ -468,19 +468,19 @@ export async function adminWalletTransactions(userId, limit = 100) {
     if (limit) params.set('limit', String(limit));
     const suffix = params.toString() ? `?${params.toString()}` : '';
     const res = await authorizedFetch(`/api/admin/wallet/${userId}/transactions${suffix}`);
-    if (!res.ok) throw new Error(`Admin wallet transactions failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Транзакції гаманця адміністратора не вдалися: ${res.status}`);
     return res.json();
 }
 
 export async function listAuctionDocuments(auctionId) {
     const res = await authorizedFetch(`/api/admin/auctions/${auctionId}/documents`);
-    if (!res.ok) throw new Error(`List documents failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Не вдалося отримати список документів: ${res.status}`);
     return res.json();
 }
 
 export async function getWalletBalance() {
     const res = await authorizedFetch('/api/me/wallet');
-    if (!res.ok) throw new Error(`Wallet balance failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Не вдалося отримати баланс гаманця: ${res.status}`);
     return res.json();
 }
 
@@ -492,7 +492,7 @@ export async function walletDeposit(amount) {
     });
     if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`Deposit failed: ${res.status} ${txt}`);
+        throw new Error(`Поповнення не вдалося: ${res.status} ${txt}`);
     }
     return res.json();
 }
@@ -505,7 +505,7 @@ export async function walletWithdraw(amount) {
     });
     if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`Withdraw failed: ${res.status} ${txt}`);
+        throw new Error(`Виведення не вдалося: ${res.status} ${txt}`);
     }
     return res.json();
 }
@@ -514,22 +514,22 @@ export async function walletTransactions(limit = 50) {
     const params = new URLSearchParams();
     if (limit) params.set('limit', String(limit));
     const res = await authorizedFetch(`/api/me/wallet/transactions?${params.toString()}`);
-    if (!res.ok) throw new Error(`Wallet transactions failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Транзакції гаманця не вдалися: ${res.status}`);
     return res.json();
 }
 
 export async function meAuctions() {
     const res = await authorizedFetch('/api/me/auctions');
-    if (!res.ok) throw new Error(`Me auctions failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Мої аукціони не вдалися: ${res.status}`);
     return res.json();
 }
 export async function meAuctionOrders() {
     const res = await authorizedFetch('/api/me/auction-orders');
-    if (!res.ok) throw new Error(`Me orders failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Мої замовлення не вдалися: ${res.status}`);
     return res.json();
 }
 export async function meDocuments() {
     const res = await authorizedFetch('/api/me/documents');
-    if (!res.ok) throw new Error(`Me documents failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Мої документи не вдалися: ${res.status}`);
     return res.json();
 }

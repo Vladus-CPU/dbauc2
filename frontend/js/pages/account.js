@@ -12,57 +12,70 @@ function el(tag, props = {}, ...children) {
 	return e;
 }
 
-const heroBullet = (text) => el('li', { 
-	className: 'auth-hero__item' }, text);
+const heroBullet = (text) => el('li', {
+	className: 'auth-hero__item'
+}, text);
 
 async function renderAuth(container) {
 	container.innerHTML = '';
-	const wrap = el('div', { 
-		className: 'auth-wrap' });
-	const layout = el('div', { 
-		className: 'auth-layout' });
-	const hero = el('section', { 
-		className: 'glass-panel auth-hero' },
-		el('span', { 
-			className: 'badge badge--accent' }, 'Welcome'),
-		el('h2', { 
-			className: 'auth-hero__title' }, 'Trade with confidence'),
-		el('p', { 
-			className: 'auth-hero__subtitle' }, 'Create your identity, getting balance, and join sealed auctions all from a single dashboard.'),
-		el('ul', { 
-			className: 'auth-hero__list' },
-			heroBullet('Unified resource vault & account controls'),
-			heroBullet('Instant notifications after each clearing run'),
-			heroBullet('What’s up')
+	const wrap = el('div', {
+		className: 'auth-wrap'
+	});
+	const layout = el('div', {
+		className: 'auth-layout'
+	});
+	const hero = el('section', {
+		className: 'glass-panel auth-hero'
+	},
+		el('span', {
+			className: 'badge badge--accent'
+		}, 'Ласкаво просимо'),
+		el('h2', {
+			className: 'auth-hero__title'
+		}, 'Торгуйте з впевненістю'),
+		el('p', {
+			className: 'auth-hero__subtitle'
+		}, 'Створіть свій профіль, поповніть баланс та приєднуйтесь до закритих аукціонів з єдиної панелі керування.'),
+		el('ul', {
+			className: 'auth-hero__list'
+		},
+			heroBullet('Єдине сховище ресурсів та керування акаунтами'),
+			heroBullet('Миттєві сповіщення після кожного клірингу'),
+			heroBullet('Все під контролем')
 		)
 	);
-	const card = el('section', { 
-		className: 'form-card' });
-	const tabs = el('div', { 
-		className: 'auth-tabs' });
-	const tabLogin = el('div', { 
-		className: 'auth-tab auth-tab--active' }, 'Login');
-	const tabRegister = el('div', { 
-		className: 'auth-tab' }, 'Register');
+	const card = el('section', {
+		className: 'form-card'
+	});
+	const tabs = el('div', {
+		className: 'auth-tabs'
+	});
+	const tabLogin = el('div', {
+		className: 'auth-tab auth-tab--active'
+	}, 'Вхід');
+	const tabRegister = el('div', {
+		className: 'auth-tab'
+	}, 'Реєстрація');
 	tabs.append(tabLogin, tabRegister);
-	const body = el('div', { 
-		className: 'form-section' });
+	const body = el('div', {
+		className: 'form-section'
+	});
 	const login = el('form', {
 		className: 'form-grid auth-form',
-		'aria-label': 'Login form'
+		'aria-label': 'Форма входу'
 	},
 		el('div', { className: 'auth-form__header' },
-			el('h3', { className: 'auth-form__title' }, 'Sign in'),
-			el('p', { className: 'auth-form__subtitle', style: 'text-align:center, padding: auto; margin: auto;' }, 'Access your dashboard to manage accounts and auctions.')
+			el('h3', { className: 'auth-form__title' }, 'Увійти'),
+			el('p', { className: 'auth-form__subtitle', style: 'text-align:center, padding: auto; margin: auto;' }, 'Отримайте доступ до панелі керування акаунтами та аукціонами.')
 		),
 		el('div', { className: 'form-row' },
-			el('label', { className: 'form__label', htmlFor: 'login_username' }, 'Username'),
+			el('label', { className: 'form__label', htmlFor: 'login_username' }, 'Ім\'я користувача'),
 			el('div', { className: 'input-group' },
 				el('input', {
 					id: 'login_username',
 					className: 'form__input',
 					name: 'username',
-					placeholder: 'Your username',
+					placeholder: 'Ваше ім\'я користувача',
 					required: true,
 					minLength: 3,
 					autocomplete: 'username'
@@ -71,7 +84,7 @@ async function renderAuth(container) {
 			el('div', { className: 'error-text', id: 'login_user_error', style: 'display:none;' })
 		),
 		el('div', { className: 'form-row' },
-			el('label', { className: 'form__label', htmlFor: 'login_password' }, 'Password'),
+			el('label', { className: 'form__label', htmlFor: 'login_password' }, 'Пароль'),
 			el('div', { className: 'input-group' },
 				el('input', {
 					id: 'login_password',
@@ -89,113 +102,153 @@ async function renderAuth(container) {
 		el('div', { className: 'form-row form-row--options', style: 'display:flex; gap:12px; align-items:center; justify-content:space-between;' },
 			el('label', { className: 'form__row', style: 'display:flex; gap:8px; align-items:center;' },
 				el('input', { className: 'form__checkbox', type: 'checkbox', name: 'showpass' }),
-				el('span', {}, 'Show password')
+				el('span', {}, 'Показати пароль')
 			),
 			el('label', { className: 'form__row', style: 'display:flex; gap:8px; align-items:center;' },
 				el('input', { className: 'form__checkbox', type: 'checkbox', name: 'remember', checked: true }),
-				el('span', {}, 'Remember me')
+				el('span', {}, 'Запам\'ятати мене')
 			)
 		),
 		el('div', { className: 'form-row' },
 			el('div', { className: 'error-text', id: 'login_error', style: 'display:none;' }),
 			el('div', { className: 'form-actions' },
-				el('button', { type: 'submit', className: 'btn btn-primary' }, 'Login')
+				el('button', { type: 'submit', className: 'btn btn-primary' }, 'Увійти')
 			)
 		)
 	);
 
-	const reg = el('form', { 
-		className: 'form-grid form-grid--two auth-form auth-form--register', style: 'display:none;', 'aria-label': 'Register form' },
-		el('div', { 
-			className: 'auth-form__header', style: 'grid-column: 1 / -1;' },
-			el('h3', { 
-				className: 'auth-form__title' }, 'Create account'),
-			el('p', { 
-				className: 'auth-form__subtitle' }, 'Register to participate in auctions, upload documents, and manage funds.')
+	const reg = el('form', {
+		className: 'form-grid form-grid--two auth-form auth-form--register', style: 'display:none;', 'aria-label': 'Форма реєстрації'
+	},
+		el('div', {
+			className: 'auth-form__header', style: 'grid-column: 1 / -1;'
+		},
+			el('h3', {
+				className: 'auth-form__title'
+			}, 'Створити акаунт'),
+			el('p', {
+				className: 'auth-form__subtitle'
+			}, 'Зареєструйтеся, щоб брати участь в аукціонах, завантажувати документи та керувати коштами.')
 		),
-		el('div', { 
-			className: 'form-row' },
-			el('label', { 
-				className: 'form__label', htmlFor: 'reg_username' }, 'Username'),
-			el('input', { 
-				id: 'reg_username', className: 'form__input', name: 'username', placeholder: 'Choose a username', required: true, minLength: 3, autocomplete: 'username' }),
-			el('div', { 
-				className: 'error-text', id: 'reg_user_error', style: 'display:none;' })
+		el('div', {
+			className: 'form-row'
+		},
+			el('label', {
+				className: 'form__label', htmlFor: 'reg_username'
+			}, 'Ім\'я користувача'),
+			el('input', {
+				id: 'reg_username', className: 'form__input', name: 'username', placeholder: 'Оберіть ім\'я користувача', required: true, minLength: 3, autocomplete: 'username'
+			}),
+			el('div', {
+				className: 'error-text', id: 'reg_user_error', style: 'display:none;'
+			})
 		),
-		el('div', { 
-			className: 'form-row' },
-			el('label', { 
-				className: 'form__label', htmlFor: 'reg_email' }, 'Email (optional)'),
-			el('input', { 
-				id: 'reg_email', className: 'form__input', name: 'email', placeholder: 'name@example.com', type: 'email', autocomplete: 'email' })
+		el('div', {
+			className: 'form-row'
+		},
+			el('label', {
+				className: 'form__label', htmlFor: 'reg_email'
+			}, 'Email (необов\'язково)'),
+			el('input', {
+				id: 'reg_email', className: 'form__input', name: 'email', placeholder: 'name@example.com', type: 'email', autocomplete: 'email'
+			})
 		),
-		el('div', { 
-			className: 'form-row' },
-			el('label', { 
-				className: 'form__label', htmlFor: 'reg_password' }, 'Password'),
-			el('input', { 
-				id: 'reg_password', className: 'form__input', name: 'password', placeholder: 'At least 4 characters', type: 'password', required: true, minLength: 4, autocomplete: 'new-password' }),
-			el('div', { 
-				className: 'error-text', id: 'reg_pass_error', style: 'display:none;' }),
-			el('div', { 
-				className: 'hint' }, 'Minimum 4 characters')
+		el('div', {
+			className: 'form-row'
+		},
+			el('label', {
+				className: 'form__label', htmlFor: 'reg_password'
+			}, 'Пароль'),
+			el('input', {
+				id: 'reg_password', className: 'form__input', name: 'password', placeholder: 'Мінімум 4 символи', type: 'password', required: true, minLength: 4, autocomplete: 'new-password'
+			}),
+			el('div', {
+				className: 'error-text', id: 'reg_pass_error', style: 'display:none;'
+			}),
+			el('div', {
+				className: 'hint'
+			}, 'Мінімум 4 символи')
 		),
-		el('div', { 
-			className: 'form-row' },
-			el('label', { 
-				className: 'form__label', htmlFor: 'reg_first' }, 'First name'),
-			el('input', { 
-				id: 'reg_first', className: 'form__input', name: 'firstName', placeholder: 'First name', required: true, minLength: 2 }),
-			el('div', { 
-				className: 'error-text', id: 'reg_first_error', style: 'display:none;' })
+		el('div', {
+			className: 'form-row'
+		},
+			el('label', {
+				className: 'form__label', htmlFor: 'reg_first'
+			}, 'Ім\'я'),
+			el('input', {
+				id: 'reg_first', className: 'form__input', name: 'firstName', placeholder: 'Ім\'я', required: true, minLength: 2
+			}),
+			el('div', {
+				className: 'error-text', id: 'reg_first_error', style: 'display:none;'
+			})
 		),
-		el('div', { 
-			className: 'form-row' },
-			el('label', { 
-				className: 'form__label', htmlFor: 'reg_last' }, 'Last name'),
-			el('input', { 
-				id: 'reg_last', className: 'form__input', name: 'lastName', placeholder: 'Last name', required: true, minLength: 2 }),
-			el('div', { 
-				className: 'error-text', id: 'reg_last_error', style: 'display:none;' })
+		el('div', {
+			className: 'form-row'
+		},
+			el('label', {
+				className: 'form__label', htmlFor: 'reg_last'
+			}, 'Прізвище'),
+			el('input', {
+				id: 'reg_last', className: 'form__input', name: 'lastName', placeholder: 'Прізвище', required: true, minLength: 2
+			}),
+			el('div', {
+				className: 'error-text', id: 'reg_last_error', style: 'display:none;'
+			})
 		),
-		el('div', { 
-			className: 'form-row' },
-			el('label', { 
-				className: 'form__label', htmlFor: 'reg_city' }, 'City'),
-			el('input', { 
-				id: 'reg_city', className: 'form__input', name: 'city', placeholder: 'City' })
+		el('div', {
+			className: 'form-row'
+		},
+			el('label', {
+				className: 'form__label', htmlFor: 'reg_city'
+			}, 'Місто'),
+			el('input', {
+				id: 'reg_city', className: 'form__input', name: 'city', placeholder: 'Місто'
+			})
 		),
-		el('div', { 
-			className: 'form-row' },
-			el('label', { 
-				className: 'form__label', htmlFor: 'reg_region' }, 'Region'),
-			el('input', { 
-				id: 'reg_region', className: 'form__input', name: 'region', placeholder: 'Region' })
+		el('div', {
+			className: 'form-row'
+		},
+			el('label', {
+				className: 'form__label', htmlFor: 'reg_region'
+			}, 'Регіон'),
+			el('input', {
+				id: 'reg_region', className: 'form__input', name: 'region', placeholder: 'Регіон'
+			})
 		),
-		el('div', { 
-			className: 'form-row' },
-			el('label', { 
-				className: 'form__label', htmlFor: 'reg_country' }, 'Country'),
-			el('input', { 
-				id: 'reg_country', className: 'form__input', name: 'country', placeholder: 'Country' })
+		el('div', {
+			className: 'form-row'
+		},
+			el('label', {
+				className: 'form__label', htmlFor: 'reg_country'
+			}, 'Країна'),
+			el('input', {
+				id: 'reg_country', className: 'form__input', name: 'country', placeholder: 'Країна'
+			})
 		),
-		el('div', { 
-			className: 'form-row', style: 'grid-column: 1 / -1; display:flex; gap:8px; align-items:center;' },
-			el('label', { 
-				className: 'form__row', style: 'gap:6px; display:flex; align-items:center;' },
-				el('input', { 
-					className: 'form__checkbox', type: 'checkbox', name: 'showpass' }),
-				'Show password'
+		el('div', {
+			className: 'form-row', style: 'grid-column: 1 / -1; display:flex; gap:8px; align-items:center;'
+		},
+			el('label', {
+				className: 'form__row', style: 'gap:6px; display:flex; align-items:center;'
+			},
+				el('input', {
+					className: 'form__checkbox', type: 'checkbox', name: 'showpass'
+				}),
+				'Показати пароль'
 			)
 		),
-		el('div', { 
-			className: 'form-row', style: 'grid-column: 1 / -1; display:flex; justify-content:space-between; align-items:center;' },
-			el('div', { 
-				className: 'error-text', id: 'reg_error', style: 'display:none;' }),
-			el('div', { 
-				className: 'form-actions' },
-				el('button', { 
-					type: 'submit', className: 'btn btn-primary' }, 'Create account')
+		el('div', {
+			className: 'form-row', style: 'grid-column: 1 / -1; display:flex; justify-content:space-between; align-items:center;'
+		},
+			el('div', {
+				className: 'error-text', id: 'reg_error', style: 'display:none;'
+			}),
+			el('div', {
+				className: 'form-actions'
+			},
+				el('button', {
+					type: 'submit', className: 'btn btn-primary'
+				}, 'Створити акаунт')
 			)
 		)
 	);
@@ -204,21 +257,21 @@ async function renderAuth(container) {
 	layout.append(hero, card);
 	wrap.appendChild(layout);
 	container.appendChild(wrap);
-	function showLogin() { 
-		tabLogin.classList.add('auth-tab--active'); tabRegister.classList.remove('auth-tab--active'); login.style.display = 'grid'; reg.style.display = 'none'; 
+	function showLogin() {
+		tabLogin.classList.add('auth-tab--active'); tabRegister.classList.remove('auth-tab--active'); login.style.display = 'grid'; reg.style.display = 'none';
 	}
-	function showRegister() { 
-		tabRegister.classList.add('auth-tab--active'); tabLogin.classList.remove('auth-tab--active'); login.style.display = 'none'; reg.style.display = 'grid'; 
+	function showRegister() {
+		tabRegister.classList.add('auth-tab--active'); tabLogin.classList.remove('auth-tab--active'); login.style.display = 'none'; reg.style.display = 'grid';
 	}
 	tabLogin.onclick = showLogin; tabRegister.onclick = showRegister;
 	const loginPwd = login.querySelector('input[name="password"]');
 	const loginShow = login.querySelector('input[name="showpass"]');
-	if (loginShow) loginShow.addEventListener('change', () => { 
-		loginPwd.type = loginShow.checked ? 'text' : 'password'; 
+	if (loginShow) loginShow.addEventListener('change', () => {
+		loginPwd.type = loginShow.checked ? 'text' : 'password';
 	});
 	const loginBtn = login.querySelector('button[type="submit"]');
-	function updateLoginValidity() { 
-		loginBtn.disabled = !login.checkValidity(); 
+	function updateLoginValidity() {
+		loginBtn.disabled = !login.checkValidity();
 	}
 	login.addEventListener('input', updateLoginValidity);
 	updateLoginValidity();
@@ -227,21 +280,25 @@ async function renderAuth(container) {
 		const p = login.querySelector('input[name="password"]');
 		const ue = login.querySelector('#login_user_error');
 		const pe = login.querySelector('#login_pass_error');
-		if (!u.checkValidity()) { 
-			ue.textContent = 'Username must be at least 3 characters'; ue.style.display = 'block'; }
-		else { 
-			ue.textContent = ''; ue.style.display = 'none'; }
-		if (!p.checkValidity()) { 
-			pe.textContent = 'Password must be at least 4 characters'; pe.style.display = 'block'; }
-		else { 
-			pe.textContent = ''; pe.style.display = 'none'; }
+		if (!u.checkValidity()) {
+			ue.textContent = 'Ім\'я користувача має містити принаймні 3 символи'; ue.style.display = 'block';
+		}
+		else {
+			ue.textContent = ''; ue.style.display = 'none';
+		}
+		if (!p.checkValidity()) {
+			pe.textContent = 'Пароль має містити принаймні 4 символи'; pe.style.display = 'block';
+		}
+		else {
+			pe.textContent = ''; pe.style.display = 'none';
+		}
 	}
 	login.addEventListener('input', updateLoginErrors);
 	updateLoginErrors();
 	const regPwd = reg.querySelector('input[name="password"]');
 	const regShow = reg.querySelector('input[name="showpass"]');
-	if (regShow) regShow.addEventListener('change', () => { 
-		regPwd.type = regShow.checked ? 'text' : 'password'; 
+	if (regShow) regShow.addEventListener('change', () => {
+		regPwd.type = regShow.checked ? 'text' : 'password';
 	});
 	const regBtn = reg.querySelector('button[type="submit"]');
 	function updateRegValidity() { regBtn.disabled = !reg.checkValidity(); }
@@ -256,22 +313,30 @@ async function renderAuth(container) {
 		const fe = reg.querySelector('#reg_first_error');
 		const l = reg.querySelector('input[name="lastName"]');
 		const le = reg.querySelector('#reg_last_error');
-		if (!u.checkValidity()) { 
-			ue.textContent = 'Username must be at least 3 characters'; ue.style.display = 'block'; }
-		else { 
-			ue.textContent = ''; ue.style.display = 'none'; }
-		if (!p.checkValidity()) { 
-			pe.textContent = 'Password must be at least 4 characters'; pe.style.display = 'block'; }
-		else { 
-			pe.textContent = ''; pe.style.display = 'none'; }
-		if (!f.checkValidity()) { 
-			fe.textContent = 'First name is required'; fe.style.display = 'block'; }
-		else { 
-			fe.textContent = ''; fe.style.display = 'none'; }
-		if (!l.checkValidity()) { 
-			le.textContent = 'Last name is required'; le.style.display = 'block'; }
-		else { 
-			le.textContent = ''; le.style.display = 'none'; }
+		if (!u.checkValidity()) {
+			ue.textContent = 'Ім\'я користувача має містити принаймні 3 символи'; ue.style.display = 'block';
+		}
+		else {
+			ue.textContent = ''; ue.style.display = 'none';
+		}
+		if (!p.checkValidity()) {
+			pe.textContent = 'Пароль має містити принаймні 4 символи'; pe.style.display = 'block';
+		}
+		else {
+			pe.textContent = ''; pe.style.display = 'none';
+		}
+		if (!f.checkValidity()) {
+			fe.textContent = 'Ім\'я є обов\'язковим'; fe.style.display = 'block';
+		}
+		else {
+			fe.textContent = ''; fe.style.display = 'none';
+		}
+		if (!l.checkValidity()) {
+			le.textContent = 'Прізвище є обов\'язковим'; le.style.display = 'block';
+		}
+		else {
+			le.textContent = ''; le.style.display = 'none';
+		}
 	}
 	reg.addEventListener('input', updateRegErrors);
 	updateRegErrors();
@@ -280,20 +345,20 @@ async function renderAuth(container) {
 		const fd = new FormData(login);
 		const errBox = login.querySelector('#login_error');
 		errBox.style.display = 'none'; errBox.textContent = '';
-		const prev = loginBtn.textContent; loginBtn.disabled = true; loginBtn.textContent = 'Logging in...';
+		const prev = loginBtn.textContent; loginBtn.disabled = true; loginBtn.textContent = 'Входимо...';
 		try {
-			await loginUser({ 
-				username: String(fd.get('username')), password: String(fd.get('password')), remember: !!fd.get('remember') 
+			await loginUser({
+				username: String(fd.get('username')), password: String(fd.get('password')), remember: !!fd.get('remember')
 			});
 			const token = getToken();
 			if (!token) {
-				throw new Error('Token was not set after login');
+				throw new Error('Токен не встановлено після входу');
 			}
 			clearCachedSession();
-			showToast('Login successful! Redirecting...', 'success');
+			showToast('Вхід успішний! Переходимо...', 'success');
 			window.location.replace('profile.html');
 		} catch (err) {
-			const msg = err?.message || 'Login failed';
+			const msg = err?.message || 'Помилка входу';
 			showToast(msg, 'error');
 			errBox.textContent = msg; errBox.style.display = 'block';
 		} finally {
@@ -305,7 +370,7 @@ async function renderAuth(container) {
 		const fd = new FormData(reg);
 		const errBox = reg.querySelector('#reg_error');
 		errBox.style.display = 'none'; errBox.textContent = '';
-		const prev = regBtn.textContent; regBtn.disabled = true; regBtn.textContent = 'Creating...';
+		const prev = regBtn.textContent; regBtn.disabled = true; regBtn.textContent = 'Створюємо...';
 		try {
 			const trim = (name) => {
 				const raw = fd.get(name);
@@ -322,16 +387,16 @@ async function renderAuth(container) {
 				country: trim('country') || undefined
 			};
 			await registerUser(payload);
-			showToast('Account created successfully!', 'success');
+			showToast('Акаунт успішно створено!', 'success');
 			await loginUser({ username: payload.username, password: payload.password, remember: true });
 			const token = getToken();
-			showToast('Logged in automatically! Redirecting...', 'success');
+			showToast('Автовхід виконано! Переходимо...', 'success');
 			clearCachedSession();
 			setTimeout(() => {
 				window.location.replace('profile.html');
 			}, 1000);
 		} catch (err) {
-			const msg = err?.message || 'Register failed';
+			const msg = err?.message || 'Помилка реєстрації';
 			showToast(msg, 'error');
 			errBox.textContent = msg; errBox.style.display = 'block';
 		} finally {
@@ -343,63 +408,71 @@ async function renderAuth(container) {
 }
 async function renderDashboard(container, session) {
 	container.innerHTML = '';
-	const shell = el('div', { 
-		className: 'dashboard-shell' 
+	const shell = el('div', {
+		className: 'dashboard-shell'
 	});
 	container.appendChild(shell);
 	const profileDetails = await getMyProfile().catch(() => null);
 	const profile = profileDetails?.profile || {};
 	const fullNameParts = [profile.first_name, profile.last_name].filter(Boolean);
 	const locationParts = [profile.city, profile.region, profile.country].filter(Boolean);
-	const head = el('section', { 
-		className: 'dashboard-card dashboard-card--header' 
+	const head = el('section', {
+		className: 'dashboard-card dashboard-card--header'
 	},
-		el('span', { 
-			className: 'eyebrow' }, 'Signed in'),
-		el('div', { 
-			className: 'dashboard-card__title' },
+		el('span', {
+			className: 'eyebrow'
+		}, 'Увійшли'),
+		el('div', {
+			className: 'dashboard-card__title'
+		},
 			el('span', {}, session.user.username),
-			el('span', { 
-				className: `badge ${session.user.is_admin ? 'badge--accent' : 'badge--outline'}` }, session.user.is_admin ? 'Admin' : 'Trader')
+			el('span', {
+				className: `badge ${session.user.is_admin ? 'badge--accent' : 'badge--outline'}`
+			}, session.user.is_admin ? 'Адмін' : 'Трейдер')
 		),
-		el('p', { 
-			className: 'dashboard-card__subtitle' }, fullNameParts.length ? fullNameParts.join(' ') : 'Complete your profile to speed up auction approvals.'),
+		el('p', {
+			className: 'dashboard-card__subtitle'
+		}, fullNameParts.length ? fullNameParts.join(' ') : 'Заповніть профіль, щоб прискорити схвалення на аукціонах.'),
 		(() => {
-			const meta = el('div', { 
-				className: 'dashboard-card__meta' 
+			const meta = el('div', {
+				className: 'dashboard-card__meta'
 			});
-			meta.appendChild(el('span', {}, `User #${session.user.id}`));
+			meta.appendChild(el('span', {}, `Користувач #${session.user.id}`));
 			if (session.user.email) meta.appendChild(el('span', {}, `Email • ${session.user.email}`));
-			if (locationParts.length) meta.appendChild(el('span', {}, `Location • ${locationParts.join(', ')}`));
+			if (locationParts.length) meta.appendChild(el('span', {}, `Локація • ${locationParts.join(', ')}`));
 			return meta;
 		})(),
 		(() => {
-			const chips = el('div', { 
-				className: 'stat-chips' 
+			const chips = el('div', {
+				className: 'stat-chips'
 			});
-			chips.appendChild(el('span', { 
-				className: 'chip chip--accent' }, session.user.is_admin ? 'Admin access' : 'Trader access'));
-			if (profileDetails?.role) chips.appendChild(el('span', { 
-				className: 'chip' }, `Role • ${profileDetails.role}`));
-			if (profile.updated_at) chips.appendChild(el('span', { 
-				className: 'chip' }, `Updated ${new Date(profile.updated_at).toLocaleString()}`));
+			chips.appendChild(el('span', {
+				className: 'chip chip--accent'
+			}, session.user.is_admin ? 'Доступ адміна' : 'Доступ трейдера'));
+			if (profileDetails?.role) chips.appendChild(el('span', {
+				className: 'chip'
+			}, `Роль • ${profileDetails.role}`));
+			if (profile.updated_at) chips.appendChild(el('span', {
+				className: 'chip'
+			}, `Оновлено ${new Date(profile.updated_at).toLocaleString()}`));
 			return chips;
 		})(),
 		(() => {
-			const actions = el('div', { 
-				className: 'dashboard-card__actions' 
+			const actions = el('div', {
+				className: 'dashboard-card__actions'
 			});
 			const openProfile = el('a', {
-				className: 'btn btn-primary', href: 'profile.html' }, 'Open profile');
+				className: 'btn btn-primary', href: 'profile.html'
+			}, 'Відкрити профіль');
 			const logoutBtn = el('button', {
 				className: 'btn btn-ghost',
-				onclick: async () => { 
+				onclick: async () => {
 					setToken('');
 					clearCachedSession();
-					showToast('Logged out', 'info');
+					showToast('Ви вийшли', 'info');
 					await renderRoot(container, { forceRefresh: true });
 				}
-			}, 'Sign out');
+			}, 'Вийти');
 			actions.append(openProfile, logoutBtn);
 			if (!session.user.is_admin) {
 				actions.appendChild(el('button', {
@@ -407,50 +480,53 @@ async function renderDashboard(container, session) {
 					onclick: async () => {
 						try {
 							const res = await bootstrapAdmin();
-							showToast(res.message || 'You now have admin access', 'success');
+							showToast(res.message || 'Тепер у вас є доступ адміна', 'success');
 							clearCachedSession();
 							await renderRoot(container, { forceRefresh: true });
 						} catch (e) {
-							showToast(e?.message || 'Bootstrap failed', 'error');
+							showToast(e?.message || 'Помилка ініціалізації', 'error');
 						}
 					}
-				}, 'Bootstrap admin'));
+				}, 'Ініціалізувати адміна'));
 			}
 			return actions;
 		})()
 	);
 	shell.appendChild(head);
-	const workspace = el('section', { 
-		className: 'dashboard-card' 
+	const workspace = el('section', {
+		className: 'dashboard-card'
 	});
 	workspace.append(
 		el('div', { className: 'section-heading' },
-			el('span', { 
-				className: 'eyebrow' }, 'Control center'),
-			el('h2', { 
-				className: 'section-heading__title' }, 'Manage your exchange presence'),
-			el('p', { 
-				className: 'section-heading__meta' }, 'Keep credentials current, curate accounts, and prepare resources before each sealed auction.')
+			el('span', {
+				className: 'eyebrow'
+			}, 'Центр керування'),
+			el('h2', {
+				className: 'section-heading__title'
+			}, 'Керуйте своєю присутністю на біржі'),
+			el('p', {
+				className: 'section-heading__meta'
+			}, 'Підтримуйте дані в актуальному стані, керуйте акаунтами та готуйте ресурси перед кожним закритим аукціоном.')
 		)
 	);
-	const tabs = el('div', { 
-		className: 'tabs dashboard-tabs' 
+	const tabs = el('div', {
+		className: 'tabs dashboard-tabs'
 	});
-	const content = el('div', { 
-		className: 'tab-panel' 
+	const content = el('div', {
+		className: 'tab-panel'
 	});
 	workspace.append(tabs, content);
 	shell.appendChild(workspace);
 	const sections = [
-		{ key: 'profile', label: 'Profile', render: renderProfileTab },
+		{ key: 'profile', label: 'Профіль', render: renderProfileTab },
 	];
 	if (session.user.is_admin) {
-		sections.push({ key: 'admin-tools', label: 'Admin tools', render: renderAdminTools });
+		sections.push({ key: 'admin-tools', label: 'Інструменти адміна', render: renderAdminTools });
 	} else {
 		sections.push(
-			{ key: 'accounts', label: 'Accounts', render: renderAccounts },
-			{ key: 'auctions', label: 'Auctions', render: renderAuctions },
-			{ key: 'resources', label: 'Resources', render: renderResources },
+			{ key: 'accounts', label: 'Акаунти', render: renderAccounts },
+			{ key: 'auctions', label: 'Аукціони', render: renderAuctions },
+			{ key: 'resources', label: 'Ресурси', render: renderResources },
 		);
 	}
 	let active = 'profile';
@@ -467,8 +543,8 @@ async function renderDashboard(container, session) {
 			const maybePromise = section.render(content);
 			if (maybePromise && typeof maybePromise.then === 'function') {
 				maybePromise.catch(err => {
-					console.error(`Failed to render section ${key}`, err);
-					content.textContent = 'Failed to load section.';
+					console.error(`Не вдалося відтворити розділ ${key}`, err);
+					content.textContent = 'Не вдалося завантажити розділ.';
 				});
 			}
 		}
@@ -486,12 +562,12 @@ async function renderDashboard(container, session) {
 		const wrap = el('section', { className: 'form-section' });
 		wrap.append(
 			el('div', { className: 'section-heading' },
-				el('span', { className: 'eyebrow' }, 'Identity'),
-				el('h3', { className: 'section-heading__title' }, 'Personal details'),
-				el('p', { className: 'section-heading__meta' }, 'Update your legal details to stay compliant with auction policy.')
+				el('span', { className: 'eyebrow' }, 'Особистість'),
+				el('h3', { className: 'section-heading__title' }, 'Персональні дані'),
+				el('p', { className: 'section-heading__meta' }, 'Оновіть свої юридичні дані, щоб відповідати політиці аукціону.')
 			)
 		);
-		const status = el('span', { className: 'chip' }, 'Loading profile...');
+		const status = el('span', { className: 'chip' }, 'Завантаження профілю...');
 		wrap.append(status);
 		root.appendChild(wrap);
 		try {
@@ -499,18 +575,18 @@ async function renderDashboard(container, session) {
 			status.remove();
 			wrap.append(
 				el('div', { className: 'stat-chips' },
-					el('span', { className: 'chip chip--accent' }, `Role • ${role}`)
+					el('span', { className: 'chip chip--accent' }, `Роль • ${role}`)
 				)
 			);
 			const fieldConfigs = [
-				{ name: 'firstName', label: 'First name', required: true, value: profile?.first_name || '', maxLength: 100 },
-				{ name: 'lastName', label: 'Last name', required: true, value: profile?.last_name || '', maxLength: 100 },
+				{ name: 'firstName', label: 'Ім\'я', required: true, value: profile?.first_name || '', maxLength: 100 },
+				{ name: 'lastName', label: 'Прізвище', required: true, value: profile?.last_name || '', maxLength: 100 },
 			];
 			if (role === 'trader') {
 				fieldConfigs.push(
-					{ name: 'city', label: 'City', required: false, value: profile?.city || '', maxLength: 128 },
-					{ name: 'region', label: 'Region', required: false, value: profile?.region || '', maxLength: 128 },
-					{ name: 'country', label: 'Country', required: false, value: profile?.country || '', maxLength: 128 }
+					{ name: 'city', label: 'Місто', required: false, value: profile?.city || '', maxLength: 128 },
+					{ name: 'region', label: 'Регіон', required: false, value: profile?.region || '', maxLength: 128 },
+					{ name: 'country', label: 'Країна', required: false, value: profile?.country || '', maxLength: 128 }
 				);
 			}
 			const form = el('form', { className: 'form-grid form-grid--two' });
@@ -528,7 +604,7 @@ async function renderDashboard(container, session) {
 				);
 			});
 			const submitRow = el('div', { className: 'form-actions' },
-				el('button', { type: 'submit', className: 'btn btn-primary' }, 'Save profile')
+				el('button', { type: 'submit', className: 'btn btn-primary' }, 'Зберегти профіль')
 			);
 			form.appendChild(submitRow);
 			wrap.appendChild(form);
@@ -543,14 +619,14 @@ async function renderDashboard(container, session) {
 				});
 				try {
 					await updateMyProfile(payload);
-					showToast('Profile saved', 'success');
+					showToast('Профіль збережено', 'success');
 					await renderProfileTab(root);
 				} catch (err) {
-					showToast(err?.message || 'Profile update failed', 'error');
+					showToast(err?.message || 'Помилка оновлення профілю', 'error');
 				}
 			});
 		} catch (err) {
-			status.textContent = 'Failed to load profile';
+			status.textContent = 'Не вдалося завантажити профіль';
 			console.error(err);
 		}
 	}
@@ -560,33 +636,33 @@ async function renderDashboard(container, session) {
 		const wrap = el('section', { className: 'form-section' });
 		wrap.append(
 			el('div', { className: 'section-heading' },
-				el('span', { className: 'eyebrow' }, 'Operations'),
-				el('h3', { className: 'section-heading__title' }, 'Administration workspace'),
-				el('p', { className: 'section-heading__meta' }, 'Coordinate listings, approve participation, and supervise resource uploads without exposing trader-only tools.')
+				el('span', { className: 'eyebrow' }, 'Операції'),
+				el('h3', { className: 'section-heading__title' }, 'Робоча область адміністратора'),
+				el('p', { className: 'section-heading__meta' }, 'Координуйте лоти, затверджуйте участь та контролюйте завантаження ресурсів без доступу до інструментів трейдера.')
 			)
 		);
 		wrap.append(
 			el('div', { className: 'data-list' },
 				el('div', { className: 'data-list__item' },
-					el('span', { className: 'data-list__label' }, 'Inventory console'),
+					el('span', { className: 'data-list__label' }, 'Консоль інвентарю'),
 					el('span', { className: 'data-list__meta' }, 'Створюйте та оновлюйте лоти перед запуском аукціонів'),
-					el('a', { className: 'btn btn-primary btn-compact', href: 'listing.html' }, 'Open inventory')
+					el('a', { className: 'btn btn-primary btn-compact', href: 'listing.html' }, 'Відкрити інвентар')
 				),
 				el('div', { className: 'data-list__item' },
 					el('span', { className: 'data-list__label' }, 'Аукціонна панель'),
 					el('span', { className: 'data-list__meta' }, 'Запускайте та закривайте вікна, погоджуйте учасників і переглядайте документи'),
-					el('a', { className: 'btn btn-ghost btn-compact', href: 'admin.html' }, 'Open admin panel')
+					el('a', { className: 'btn btn-ghost btn-compact', href: 'admin.html' }, 'Відкрити панель адміна')
 				),
 				el('div', { className: 'data-list__item' },
-					el('span', { className: 'data-list__label' }, 'Trader view'),
+					el('span', { className: 'data-list__label' }, 'Вид трейдера'),
 					el('span', { className: 'data-list__meta' }, 'Використовуйте сторінку аукціонів, щоб моніторити кліринг у режимі реального часу'),
-					el('a', { className: 'btn btn-ghost btn-compact', href: 'auctions.html' }, 'View auctions')
+					el('a', { className: 'btn btn-ghost btn-compact', href: 'auctions.html' }, 'Переглянути аукціони')
 				)
 			)
 		);
 		const note = el('div', { className: 'callout' },
 			el('strong', {}, 'Порада:'),
-			el('span', {}, ' у цьому режимі приховано вкладки «Accounts», «Auctions», «Resources», щоб інтерфейс трейдерів залишався чистим.')
+			el('span', {}, ' у цьому режимі приховано вкладки «Акаунти», «Аукціони», «Ресурси», щоб інтерфейс трейдерів залишався чистим.')
 		);
 		note.style.display = 'flex';
 		note.style.flexDirection = 'column';
@@ -604,17 +680,17 @@ async function renderDashboard(container, session) {
 		const wrap = el('section', { className: 'form-section' });
 		wrap.append(
 			el('div', { className: 'section-heading' },
-				el('span', { className: 'eyebrow' }, 'Funding'),
-				el('h3', { className: 'section-heading__title' }, 'Settlement accounts'),
-				el('p', { className: 'section-heading__meta' }, 'Link banking accounts to allocate proceeds and deposits.')
+				el('span', { className: 'eyebrow' }, 'Фінансування'),
+				el('h3', { className: 'section-heading__title' }, 'Розрахункові рахунки'),
+				el('p', { className: 'section-heading__meta' }, 'Прив\'яжіть банківські рахунки для розподілу надходжень та депозитів.')
 			)
 		);
 		const list = el('div', { className: 'data-list' });
-		list.textContent = 'Loading accounts...';
+		list.textContent = 'Завантаження рахунків...';
 		wrap.appendChild(list);
 		const form = el('form', { className: 'inline-form' },
-			el('input', { className: 'field', name: 'acc', placeholder: 'Account number', required: true }),
-			el('button', { className: 'btn btn-primary btn-compact', type: 'submit' }, 'Add account')
+			el('input', { className: 'field', name: 'acc', placeholder: 'Номер рахунку', required: true }),
+			el('button', { className: 'btn btn-primary btn-compact', type: 'submit' }, 'Додати рахунок')
 		);
 		wrap.appendChild(form);
 		root.appendChild(wrap);
@@ -626,11 +702,11 @@ async function renderDashboard(container, session) {
 			if (!acc) return;
 			try {
 				await addAccount(acc);
-				showToast('Account added', 'success');
+				showToast('Рахунок додано', 'success');
 				await refresh();
 				form.reset();
 			} catch (e) {
-				showToast(e?.message || 'Add account failed', 'error');
+				showToast(e?.message || 'Не вдалося додати рахунок', 'error');
 			}
 		});
 
@@ -638,7 +714,7 @@ async function renderDashboard(container, session) {
 			try {
 				const accounts = await listAccounts();
 				if (!accounts.length) {
-					list.textContent = 'No accounts yet — add one to join auctions.';
+					list.textContent = 'Рахунків ще немає — додайте один, щоб приєднатися до аукціонів.';
 					return;
 				}
 				list.innerHTML = '';
@@ -651,7 +727,7 @@ async function renderDashboard(container, session) {
 					);
 				});
 			} catch {
-				list.textContent = 'Failed to load accounts';
+				list.textContent = 'Не вдалося завантажити рахунки';
 			}
 		}
 		await refresh();
@@ -662,24 +738,24 @@ async function renderDashboard(container, session) {
 		const wrap = el('section', { className: 'form-section' });
 		wrap.append(
 			el('div', { className: 'section-heading' },
-				el('span', { className: 'eyebrow' }, 'Auctions'),
-				el('h3', { className: 'section-heading__title' }, 'Collecting windows'),
-				el('p', { className: 'section-heading__meta' }, 'Join live auctions, place sealed orders, and watch clearing status.')
+				el('span', { className: 'eyebrow' }, 'Аукціони'),
+				el('h3', { className: 'section-heading__title' }, 'Вікна збору заявок'),
+				el('p', { className: 'section-heading__meta' }, 'Приєднуйтесь до активних аукціонів, розміщуйте закриті ордери та відстежуйте статус кліринга.')
 			)
 		);
 		const list = el('div', { className: 'stack-grid' });
-		list.textContent = 'Loading auctions...';
+		list.textContent = 'Завантаження аукціонів...';
 		wrap.appendChild(list);
 		root.appendChild(wrap);
 
 		let cachedAccounts = [];
-		try { cachedAccounts = await listAccounts(); } catch {}
+		try { cachedAccounts = await listAccounts(); } catch { }
 
 		async function refresh() {
 			try {
 				const auctions = await listAuctions({ status: 'collecting' });
 				if (!auctions.length) {
-					list.textContent = 'No collecting auctions right now.';
+					list.textContent = 'Зараз немає аукціонів зі збором заявок.';
 					return;
 				}
 				list.innerHTML = '';
@@ -690,51 +766,51 @@ async function renderDashboard(container, session) {
 						el('span', { className: 'pill pill--outline' }, a.type),
 						el('span', { className: 'chip' }, `k = ${a.k_value}`)
 					);
-					if (a.window_start) header.appendChild(el('span', { className: 'chip' }, `Start • ${new Date(a.window_start).toLocaleString()}`));
-					if (a.window_end) header.appendChild(el('span', { className: 'chip' }, `End • ${new Date(a.window_end).toLocaleString()}`));
-					const statusChip = el('div', { className: 'stack-card__meta' }, 'Checking participation...');
+					if (a.window_start) header.appendChild(el('span', { className: 'chip' }, `Початок • ${new Date(a.window_start).toLocaleString()}`));
+					if (a.window_end) header.appendChild(el('span', { className: 'chip' }, `Кінець • ${new Date(a.window_end).toLocaleString()}`));
+					const statusChip = el('div', { className: 'stack-card__meta' }, 'Перевірка участі...');
 					try {
 						const st = await myParticipationStatus(a.id);
-						statusChip.textContent = st?.status ? `Status • ${st.status}` : 'Status • not joined';
+						statusChip.textContent = st?.status ? `Статус • ${st.status}` : 'Статус • не приєднався';
 					} catch {
-						statusChip.textContent = 'Status • unavailable';
+						statusChip.textContent = 'Статус • недоступний';
 					}
 
 					const controls = el('div', { className: 'stack-card__actions' });
-					const accSel = el('select', { className: 'field' }, el('option', { value: '' }, 'Choose account (optional)'));
+					const accSel = el('select', { className: 'field' }, el('option', { value: '' }, 'Оберіть рахунок (необов\'язково)'));
 					cachedAccounts.forEach(acc => accSel.appendChild(el('option', { value: String(acc.id) }, `#${acc.id} ${acc.account_number}`)));
-					const joinBtn = el('button', { className: 'btn btn-primary btn-compact', type: 'button' }, 'Join auction');
+					const joinBtn = el('button', { className: 'btn btn-primary btn-compact', type: 'button' }, 'Приєднатися до аукціону');
 					joinBtn.addEventListener('click', async () => {
 						try {
 							const val = accSel.value ? Number(accSel.value) : undefined;
 							await joinAuction(a.id, val);
-							showToast('Join submitted', 'success');
+							showToast('Заявку подано', 'success');
 						} catch (e) {
-							showToast(e?.message || 'Join failed', 'error');
+							showToast(e?.message || 'Не вдалося приєднатися', 'error');
 						}
 					});
 
 					const orderForm = el('form', { className: 'inline-form' },
 						el('select', { className: 'field', name: 'type' },
-							el('option', { value: 'bid' }, 'bid'),
-							el('option', { value: 'ask' }, 'ask')
+							el('option', { value: 'bid' }, 'купівля'),
+							el('option', { value: 'ask' }, 'продаж')
 						),
-						el('input', { className: 'field', name: 'price', type: 'number', step: '0.000001', min: '0', placeholder: 'Price', required: true }),
-						el('input', { className: 'field', name: 'quantity', type: 'number', step: '0.000001', min: '0', placeholder: 'Quantity', required: true }),
-						el('button', { className: 'btn btn-ghost btn-compact', type: 'submit' }, 'Place sealed order')
+						el('input', { className: 'field', name: 'price', type: 'number', step: '0.000001', min: '0', placeholder: 'Ціна', required: true }),
+						el('input', { className: 'field', name: 'quantity', type: 'number', step: '0.000001', min: '0', placeholder: 'Кількість', required: true }),
+						el('button', { className: 'btn btn-ghost btn-compact', type: 'submit' }, 'Подати закритий ордер')
 					);
 					orderForm.addEventListener('submit', async (e) => {
 						e.preventDefault();
 						const fd = new FormData(orderForm);
 						const price = Number(fd.get('price'));
 						const qty = Number(fd.get('quantity'));
-						if (!(price > 0 && qty > 0)) { showToast('Enter positive price and quantity', 'error'); return; }
+						if (!(price > 0 && qty > 0)) { showToast('Введіть додатні ціну та кількість', 'error'); return; }
 						try {
 							await placeAuctionOrder(a.id, { type: String(fd.get('type')), price, quantity: qty });
-							showToast('Order placed', 'success');
+							showToast('Ордер розміщено', 'success');
 							orderForm.reset();
 						} catch (e) {
-							showToast(e?.message || 'Order failed', 'error');
+							showToast(e?.message || 'Помилка ордера', 'error');
 						}
 					});
 
@@ -743,7 +819,7 @@ async function renderDashboard(container, session) {
 					list.appendChild(card);
 				}
 			} catch {
-				list.textContent = 'Failed to load auctions';
+				list.textContent = 'Не вдалося завантажити аукціони';
 			}
 		}
 		await refresh();
@@ -754,44 +830,44 @@ async function renderDashboard(container, session) {
 		const wrap = el('section', { className: 'form-section' });
 		wrap.append(
 			el('div', { className: 'section-heading' },
-				el('span', { className: 'eyebrow' }, 'Resources'),
-				el('h3', { className: 'section-heading__title' }, 'Inventory & documents'),
-				el('p', { className: 'section-heading__meta' }, 'Track deposits, withdrawals, and upload inventory evidence for approval.')
+				el('span', { className: 'eyebrow' }, 'Ресурси'),
+				el('h3', { className: 'section-heading__title' }, 'Інвентар та документи'),
+				el('p', { className: 'section-heading__meta' }, 'Відстежуйте депозити, виведення та завантажуйте докази інвентаризації для схвалення.')
 			)
 		);
 
 		const resList = el('div', { className: 'data-list' });
-		resList.textContent = 'Loading transactions...';
+		resList.textContent = 'Завантаження транзакцій...';
 		wrap.appendChild(resList);
 
 		const form = el('form', { className: 'inline-form' },
 			el('select', { className: 'field', name: 'type' },
-				el('option', { value: 'deposit' }, 'deposit'),
-				el('option', { value: 'withdraw' }, 'withdraw'),
-				el('option', { value: 'inventory_add' }, 'inventory_add'),
-				el('option', { value: 'inventory_remove' }, 'inventory_remove'),
+				el('option', { value: 'deposit' }, 'депозит'),
+				el('option', { value: 'withdraw' }, 'виведення'),
+				el('option', { value: 'inventory_add' }, 'додати інвентар'),
+				el('option', { value: 'inventory_remove' }, 'вилучити інвентар'),
 			),
-			el('input', { className: 'field', name: 'quantity', type: 'number', step: '0.000001', min: '0', placeholder: 'Quantity', required: true }),
-			el('input', { className: 'field', name: 'notes', placeholder: 'Notes (optional)' }),
-			el('button', { className: 'btn btn-primary btn-compact', type: 'submit' }, 'Record movement')
+			el('input', { className: 'field', name: 'quantity', type: 'number', step: '0.000001', min: '0', placeholder: 'Кількість', required: true }),
+			el('input', { className: 'field', name: 'notes', placeholder: 'Нотатки (необов\'язково)' }),
+			el('button', { className: 'btn btn-primary btn-compact', type: 'submit' }, 'Записати рух')
 		);
 		wrap.appendChild(form);
 
 		const docsHeading = el('div', { className: 'section-heading' },
-			el('span', { className: 'eyebrow' }, 'Documents'),
-			el('h3', { className: 'section-heading__title' }, 'Supporting files'),
-			el('p', { className: 'section-heading__meta' }, 'Attach invoices, receipts, or custody certificates for compliance.')
+			el('span', { className: 'eyebrow' }, 'Документи'),
+			el('h3', { className: 'section-heading__title' }, 'Підтверджуючі файли'),
+			el('p', { className: 'section-heading__meta' }, 'Додайте рахунки, квитанції або сертифікати зберігання для відповідності.')
 		);
 		wrap.appendChild(docsHeading);
 
 		const docsList = el('div', { className: 'data-list' });
-		docsList.textContent = 'Loading documents...';
+		docsList.textContent = 'Завантаження документів...';
 		wrap.appendChild(docsList);
 
 		const docForm = el('form', { className: 'inline-form' },
 			el('input', { className: 'field', type: 'file', name: 'docFile', required: true, accept: '.pdf,.jpg,.jpeg,.png,.txt,.doc,.docx' }),
-			el('input', { className: 'field', name: 'docNote', placeholder: 'Note (optional)' }),
-			el('button', { className: 'btn btn-ghost btn-compact', type: 'submit' }, 'Upload document')
+			el('input', { className: 'field', name: 'docNote', placeholder: 'Нотатка (необов\'язково)' }),
+			el('button', { className: 'btn btn-ghost btn-compact', type: 'submit' }, 'Завантажити документ')
 		);
 		wrap.appendChild(docForm);
 		root.appendChild(wrap);
@@ -800,14 +876,14 @@ async function renderDashboard(container, session) {
 			e.preventDefault();
 			const fd = new FormData(form);
 			const q = Number(fd.get('quantity'));
-			if (!(q > 0)) { showToast('Enter positive quantity', 'error'); return; }
+			if (!(q > 0)) { showToast('Введіть додатну кількість', 'error'); return; }
 			try {
 				await addResourceTransaction({ type: String(fd.get('type')), quantity: q, notes: String(fd.get('notes') || '') || undefined });
-				showToast('Recorded', 'success');
+				showToast('Записано', 'success');
 				await refresh();
 				form.reset();
 			} catch (e) {
-				showToast(e?.message || 'Failed to record', 'error');
+				showToast(e?.message || 'Не вдалося записати', 'error');
 			}
 		});
 
@@ -817,17 +893,17 @@ async function renderDashboard(container, session) {
 			const noteInput = docForm.querySelector('input[name="docNote"]');
 			const file = fileInput.files?.[0];
 			if (!file) {
-				showToast('Choose a document to upload', 'error');
+				showToast('Оберіть документ для завантаження', 'error');
 				return;
 			}
 			try {
 				await uploadResourceDocument({ file, note: noteInput.value.trim() });
-				showToast('Document uploaded', 'success');
+				showToast('Документ завантажено', 'success');
 				fileInput.value = '';
 				noteInput.value = '';
 				await refreshDocs();
 			} catch (err) {
-				showToast(err?.message || 'Upload failed', 'error');
+				showToast(err?.message || 'Помилка завантаження', 'error');
 			}
 		});
 
@@ -835,7 +911,7 @@ async function renderDashboard(container, session) {
 			try {
 				const rows = await listResourceTransactions();
 				if (!rows.length) {
-					resList.textContent = 'No transactions yet — record your first movement.';
+					resList.textContent = 'Транзакцій ще немає — запишіть свій перший рух.';
 					return;
 				}
 				resList.innerHTML = '';
@@ -847,7 +923,7 @@ async function renderDashboard(container, session) {
 					)
 				));
 			} catch {
-				resList.textContent = 'Failed to load';
+				resList.textContent = 'Не вдалося завантажити';
 			}
 		}
 
@@ -855,7 +931,7 @@ async function renderDashboard(container, session) {
 			try {
 				const docs = await listResourceDocuments();
 				if (!docs.length) {
-					docsList.textContent = 'No documents yet — upload supporting files.';
+					docsList.textContent = 'Документів ще немає — завантажте підтверджуючі файли.';
 					return;
 				}
 				docsList.innerHTML = '';
@@ -866,12 +942,12 @@ async function renderDashboard(container, session) {
 						doc.uploadedAt ? el('span', { className: 'data-list__meta' }, new Date(doc.uploadedAt).toLocaleString()) : null
 					);
 					const downloadUrl = doc.downloadUrl?.startsWith('http') ? doc.downloadUrl : `${window.location.origin.replace(/\/$/, '')}${doc.downloadUrl}`;
-					const downloadBtn = el('a', { className: 'btn btn-ghost btn-compact', href: downloadUrl, target: '_blank', rel: 'noopener', download: doc.filename }, 'Download');
+					const downloadBtn = el('a', { className: 'btn btn-ghost btn-compact', href: downloadUrl, target: '_blank', rel: 'noopener', download: doc.filename }, 'Завантажити');
 					line.appendChild(downloadBtn);
 					docsList.appendChild(line);
 				});
 			} catch (err) {
-				docsList.textContent = 'Failed to load documents';
+				docsList.textContent = 'Не вдалося завантажити документи';
 				console.error(err);
 			}
 		}
@@ -885,7 +961,7 @@ async function renderRoot(container, options = {}) {
 	try {
 		session = await initAccessControl({ forceRefresh: Boolean(options.forceRefresh) });
 	} catch (err) {
-		console.error('Failed to resolve session', err);
+		console.error('Не вдалося вирішити сесію', err);
 	}
 	if (session?.authenticated && session.user) {
 		await renderDashboard(container, session);
