@@ -1,6 +1,6 @@
 export function createListingCard(item) {
     const data = (item && typeof item === 'object') ? item : {};
-    const titleText = (data.title || 'No Title');
+    const titleText = (data.title || 'Без назви');
 
     const card = document.createElement('article');
     card.className = 'listing-card';
@@ -11,11 +11,11 @@ export function createListingCard(item) {
     img.loading = 'lazy';
     img.decoding = 'async';
     img.src = (typeof data.image === 'string' && data.image.trim()) ? data.image : placeholderImg;
-    img.alt = titleText || 'Item Image';
+    img.alt = titleText || 'Зображення товару';
     img.onerror = function () {
         img.onerror = null;
         img.src = placeholderImg;
-        img.alt = 'No image';
+        img.alt = 'Немає зображення';
     };
     wrapper.appendChild(img);
     card.appendChild(wrapper);
@@ -27,13 +27,13 @@ export function createListingCard(item) {
     metadata.className = 'listing-card__meta';
     const bits = [];
     if (typeof data.startingBid === 'number') {
-        bits.push({ label: 'Starting Bid', value: `$${data.startingBid.toFixed(2)}` });
+        bits.push({ label: 'Початкова ставка', value: `₴${data.startingBid.toFixed(2)}` });
     }
     if (data.currentBid && typeof data.currentBid === 'number' && data.currentBid > 0 && data.currentBid > data.startingBid) {
-        bits.push({ label: 'Current Bid', value: `$${data.currentBid.toFixed(2)}` });
+        bits.push({ label: 'Поточна ставка', value: `₴${data.currentBid.toFixed(2)}` });
     }
     if (typeof data.unit === 'string' && data.unit.trim()) {
-        bits.push({ label: 'Unit', value: data.unit });
+        bits.push({ label: 'Одиниця', value: data.unit });
     }
     if (bits.length) {
         bits.forEach(bit => {
@@ -55,7 +55,7 @@ export function createListingCard(item) {
     const checkButton = document.createElement('button');
     checkButton.type = 'button';
     checkButton.className = 'btn btn-primary btn-compact';
-    checkButton.textContent = 'View Details';
+    checkButton.textContent = 'Переглянути деталі';
     checkButton.addEventListener('click', function (e) {
         e.stopPropagation();
         window.location.href = `item.html?id=${data.id || ''}`;

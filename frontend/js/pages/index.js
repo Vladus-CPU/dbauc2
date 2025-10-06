@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const listings = await getListings();
         const featured = (listings || []).slice(0, 6);
         if (featured.length === 0) {
-            container.textContent = 'No listings yet. Be the first to create one!';
+            container.textContent = 'Поки що немає лотів. Станьте першим, хто створить один!';
             return;
         }
         for (const item of featured) {
@@ -19,6 +19,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     } catch (err) {
         console.error('Failed to load featured listings', err);
-        container.textContent = 'Failed to load featured listings.';
+        container.textContent = 'Не вдалося завантажити рекомендовані лоти.';
     }
 });

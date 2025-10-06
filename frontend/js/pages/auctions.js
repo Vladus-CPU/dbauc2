@@ -90,7 +90,7 @@ function updateHero(session) {
   );
   if (session.user.is_admin) {
     cta.append(
-      el('a', { className: 'btn btn-ghost', href: 'admin.html' }, 'Відкрити Control center')
+      el('a', { className: 'btn btn-ghost', href: 'admin.html' }, 'Відкрити центр керування')
     );
   } else {
     cta.append(
@@ -224,19 +224,19 @@ function createHistoryCard(auction) {
   if (hasClearingMetrics) {
     const summaryBits = [];
     if (auction.clearing_price !== undefined && auction.clearing_price !== null) {
-      summaryBits.push(el('span', {}, `Clearing price • ${formatPrice(auction.clearing_price)}`));
+      summaryBits.push(el('span', {}, `Ціна клірингу • ${formatPrice(auction.clearing_price)}`));
     }
     if (auction.clearing_quantity !== undefined && auction.clearing_quantity !== null) {
-      summaryBits.push(el('span', {}, `Matched qty • ${formatNumber(auction.clearing_quantity)}`));
+      summaryBits.push(el('span', {}, `Зіставлена к-сть • ${formatNumber(auction.clearing_quantity)}`));
     }
     if (auction.clearing_price_low !== undefined && auction.clearing_price_low !== null && auction.clearing_price_high !== undefined && auction.clearing_price_high !== null) {
-      summaryBits.push(el('span', {}, `Price range • ${formatPrice(auction.clearing_price_low)} – ${formatPrice(auction.clearing_price_high)}`));
+      summaryBits.push(el('span', {}, `Діапазон цін • ${formatPrice(auction.clearing_price_low)} – ${formatPrice(auction.clearing_price_high)}`));
     }
     if (auction.clearing_demand !== undefined && auction.clearing_demand !== null) {
-      summaryBits.push(el('span', {}, `Demand • ${formatNumber(auction.clearing_demand)}`));
+      summaryBits.push(el('span', {}, `Попит • ${formatNumber(auction.clearing_demand)}`));
     }
     if (auction.clearing_supply !== undefined && auction.clearing_supply !== null) {
-      summaryBits.push(el('span', {}, `Supply • ${formatNumber(auction.clearing_supply)}`));
+      summaryBits.push(el('span', {}, `Пропозиція • ${formatNumber(auction.clearing_supply)}`));
     }
     if (summaryBits.length) {
       card.append(

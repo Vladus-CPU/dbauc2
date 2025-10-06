@@ -25,7 +25,7 @@ function formatDateTime(value) {
 			timeStyle: 'short',
 		}).format(date);
 	} catch (error) {
-		console.warn('Failed to format datetime', error);
+		console.warn('Не вдалося відформатувати дату та час', error);
 		return String(value);
 	}
 }
@@ -55,7 +55,7 @@ function auctionRow(a) {
 		el('strong', {}, `#${a.id} ${a.product}`),
 		el('span', { className: 'pill pill--outline' }, a.type),
 		el('span', { className: 'chip' }, `k = ${a.k_value}`),
-		el('span', { className: `chip ${a.status === 'collecting' ? 'chip--accent' : ''}` }, `Status • ${a.status}`)
+			el('span', { className: `chip ${a.status === 'collecting' ? 'chip--accent' : ''}` }, `Статус • ${a.status}`)
 	);
 	const scheduleInfo = el('div', { className: 'stack-card__meta stack-card__meta--schedule' });
 	scheduleInfo.append(
@@ -63,25 +63,25 @@ function auctionRow(a) {
 		el('span', {}, `Кінець • ${a.window_end ? formatDateTime(a.window_end) : '—'}`),
 		el('span', {}, `Створено • ${formatDateTime(a.created_at)}`)
 	);
-	const ordersInfo = el('div', { className: 'stack-card__meta' }, 'Loading orders…');
+	const ordersInfo = el('div', { className: 'stack-card__meta' }, 'Завантаження заявок…');
 	const actions = el('div', { className: 'stack-card__actions' });
 	const participantsWrap = el('div', { className: 'data-list', hidden: true });
 	const docsWrap = el('div', { className: 'data-list', style: 'margin-top: 12px;', hidden: true });
 
 	const viewBtn = el('button', { className: 'btn btn-ghost btn-compact', onclick: async () => {
 		participantsWrap.hidden = false;
-		participantsWrap.textContent = 'Loading participants…';
+		participantsWrap.textContent = 'Завантаження учасників…';
 		try {
 			const part = await listParticipantsAdmin(a.id);
 			if (!part.length) {
-				participantsWrap.textContent = 'No participants';
+				participantsWrap.textContent = 'Учасники відсутні';
 				return;
 			}
 			participantsWrap.innerHTML = '';
 			part.forEach(p => {
 				const line = el('div', { className: 'data-list__item' },
-					el('span', { className: 'data-list__label' }, `#${p.id} trader ${p.trader_id}`),
-					el('span', { className: 'chip' }, `Status • ${p.status}`)
+					el('span', { className: 'data-list__label' }, `#${p.id} трейдер ${p.trader_id}`),
+					el('span', { className: 'chip' }, `Статус • ${p.status}`)
 				);
 				if (p.status === 'pending') {
 					line.appendChild(el('button', {
@@ -89,42 +89,42 @@ function auctionRow(a) {
 						onclick: async () => {
 							try {
 								await approveParticipant(a.id, p.id);
-								showToast('Approved', 'success');
+								showToast('Схвалено', 'success');
 								await viewBtn.onclick();
 							} catch (e) {
-								showToast(e?.message || 'Approve failed', 'error');
+								showToast(e?.message || 'Не вдалося схвалити', 'error');
 							}
 						}
-					}, 'Approve'));
+					}, 'Схвалити'));
 				}
 				participantsWrap.appendChild(line);
 			});
 		} catch (e) {
-			participantsWrap.textContent = 'Failed to load participants';
+			participantsWrap.textContent = 'Не вдалося завантажити учасників';
 		}
-	}}, 'View participants');
+	}}, 'Переглянути учасників');
 
 	const clearBtn = el('button', { className: 'btn btn-primary btn-compact', onclick: async () => {
-		if (!confirm('Clear this auction now?')) return;
+		if (!confirm('Провести кліринг цього аукціону зараз?')) return;
 		const res = await clearAuction(a.id);
-		showToast(`Cleared. Price=${res.price ?? 'N/A'}`, 'success');
+		showToast(`Кліринг. Ціна=${res.price ?? 'N/A'}`, 'success');
 		await render();
-	}}, 'Clear');
+	}}, 'Кліринг');
 
 	const closeBtn = el('button', { className: 'btn btn-ghost btn-compact', onclick: async () => {
-		if (!confirm('Close this auction?')) return;
+		if (!confirm('Закрити цей аукціон?')) return;
 		await closeAuction(a.id);
-		showToast('Auction closed', 'success');
+		showToast('Аукціон закрито', 'success');
 		await render();
-	}}, 'Close');
+	}}, 'Закрити');
 
 	const docsBtn = el('button', { className: 'btn btn-ghost btn-compact', onclick: async () => {
 		docsWrap.hidden = false;
-		docsWrap.textContent = 'Loading documents…';
+		docsWrap.textContent = 'Завантаження документів…';
 		try {
 			const files = await listAuctionDocuments(a.id);
 			if (!files.length) {
-				docsWrap.textContent = 'No documents yet';
+				docsWrap.textContent = 'Документи відсутні';
 				return;
 			}
 			docsWrap.innerHTML = '';
@@ -147,18 +147,18 @@ function auctionRow(a) {
 							aTag.click();
 							aTag.remove();
 							URL.revokeObjectURL(url);
-							showToast('Downloaded', 'success');
+							showToast('Завантажено', 'success');
 						} catch (e) {
-							showToast(e?.message || 'Download failed', 'error');
+							showToast(e?.message || 'Не вдалося завантажити', 'error');
 						}
 					}
-				}, 'Download'));
+				}, 'Завантажити'));
 				docsWrap.appendChild(line);
 			});
 		} catch (e) {
-			docsWrap.textContent = 'Failed to load documents';
+			docsWrap.textContent = 'Не вдалося завантажити документи';
 		}
-	}}, 'Documents');
+	}}, 'Документи');
 
 	const refreshOrdersInfo = async () => {
 		try {
@@ -190,20 +190,20 @@ async function render() {
 	try {
 		[users, auctions, walletOverview] = await Promise.all([
 			listAdminUsers().catch((error) => {
-				console.error('Failed to load users', error);
+				console.error('Не вдалося завантажити користувачів', error);
 				return [];
 			}),
 			listAuctions().catch((error) => {
-				console.error('Failed to load auctions', error);
+				console.error('Не вдалося завантажити аукціони', error);
 				return [];
 			}),
 			adminWalletSummary().catch((error) => {
-				console.error('Failed to load wallet overview', error);
+				console.error('Не вдалося завантажити огляд гаманця', error);
 				return { users: [], totals: { available: 0, reserved: 0, total: 0 } };
 			}),
 		]);
 	} catch (error) {
-		console.error('Control center fetch failed', error);
+		console.error('Не вдалося завантажити дані для центру керування', error);
 	}
 
 	const adminCount = users.filter(u => u.is_admin).length;
@@ -220,8 +220,8 @@ async function render() {
 	const overviewCard = el('section', { className: 'dashboard-card dashboard-card--overview' });
 	overviewCard.append(
 		el('div', { className: 'section-heading' },
-			el('span', { className: 'eyebrow' }, 'Control center'),
-			el('h2', { className: 'section-heading__title' }, 'Operational snapshot'),
+			el('span', { className: 'eyebrow' }, 'Центр керування'),
+			el('h2', { className: 'section-heading__title' }, 'Оперативний знімок'),
 			el('p', { className: 'section-heading__meta' }, 'Слідкуйте за активними аукціонами, ролями команди та плануйте наступні вікна запуску.')
 		),
 		(() => {
@@ -242,7 +242,7 @@ async function render() {
 	const walletCard = el('section', { className: 'dashboard-card dashboard-card--wallet' });
 	walletCard.append(
 		el('div', { className: 'section-heading' },
-			el('span', { className: 'eyebrow' }, 'Wallets'),
+			el('span', { className: 'eyebrow' }, 'Гаманці'),
 			el('h2', { className: 'section-heading__title' }, 'Фінансовий облік користувачів'),
 			el('p', { className: 'section-heading__meta' }, 'Поповнюйте чи поверніть кошти клієнтам та слідкуйте за балансами в режимі реального часу.')
 		),
@@ -269,9 +269,9 @@ async function render() {
 			const total = available + reserved;
 			const item = el('div', { className: 'data-list__item' },
 				el('span', { className: 'data-list__label' }, `#${row.id} ${row.username || '—'}`),
-				el('span', { className: 'chip' }, `Avail • ${available.toFixed(2)}`),
-				el('span', { className: 'chip' }, `Res • ${reserved.toFixed(2)}`),
-				el('span', { className: 'data-list__meta' }, `Total ${total.toFixed(2)}`)
+				el('span', { className: 'chip' }, `Дост • ${available.toFixed(2)}`),
+				el('span', { className: 'chip' }, `Рез • ${reserved.toFixed(2)}`),
+				el('span', { className: 'data-list__meta' }, `Всього ${total.toFixed(2)}`)
 			);
 			walletUsersList.appendChild(item);
 		});
@@ -347,7 +347,7 @@ async function render() {
 				txList.appendChild(row);
 			});
 		} catch (error) {
-			console.error('Failed to load wallet transactions', error);
+			console.error('Не вдалося завантажити транзакції гаманця', error);
 			txList.textContent = 'Не вдалося завантажити транзакції.';
 		}
 	}
@@ -394,7 +394,7 @@ async function render() {
 	quickActionsCard.append(
 		el('div', { className: 'section-heading' },
 			el('span', { className: 'eyebrow' }, 'Швидкі дії'),
-			el('h2', { className: 'section-heading__title' }, 'Control center shortcuts'),
+			el('h2', { className: 'section-heading__title' }, 'Ярлики центру керування'),
 			el('p', { className: 'section-heading__meta' }, 'Стрибайте до основних робочих зон без перевантаження інтерфейсу.')
 		),
 		(() => {
@@ -452,8 +452,8 @@ async function render() {
 		el('label', { className: 'form-field' },
 			el('span', { className: 'form-field__label' }, 'Тип аукціону'),
 			el('select', { className: 'form__input', name: 'type' },
-				el('option', { value: 'open' }, 'open'),
-				el('option', { value: 'closed' }, 'closed'),
+				el('option', { value: 'open' }, 'відкритий'),
+				el('option', { value: 'closed' }, 'закритий'),
 			)
 		),
 		el('label', { className: 'form-field' },
@@ -515,7 +515,7 @@ async function render() {
 					el('span', { className: 'data-list__label' }, `#${u.id} ${u.username}${isSelf ? ' (ви)' : ''}`),
 					u.email ? el('span', { className: 'team-list__meta' }, u.email) : null
 				),
-				u.is_admin ? el('span', { className: 'chip chip--accent' }, 'Admin') : el('span', { className: 'chip' }, 'Trader')
+				u.is_admin ? el('span', { className: 'chip chip--accent' }, 'Адмін') : el('span', { className: 'chip' }, 'Трейдер')
 			);
 			const actions = el('div', { className: 'team-list__actions' });
 			if (!u.is_admin) {
@@ -531,7 +531,7 @@ async function render() {
 							showToast(error?.message || 'Не вдалося підвищити', 'error');
 						}
 					}
-				}, 'Promote'));
+				}, 'Підвищити'));
 			} else if (!isSelf) {
 				actions.appendChild(el('button', {
 					className: 'btn btn-ghost btn-compact',
@@ -545,7 +545,7 @@ async function render() {
 							showToast(error?.message || 'Не вдалося змінити роль', 'error');
 						}
 					}
-				}, 'Demote'));
+				}, 'Понизити'));
 			} else {
 				actions.appendChild(el('span', { className: 'chip' }, 'Це ви'));
 			}
@@ -566,16 +566,16 @@ async function render() {
 		(() => {
 			const chips = el('div', { className: 'status-chips' });
 			chips.append(
-				el('span', { className: 'chip chip--accent' }, `Collecting • ${collectingAuctions.length}`),
-				el('span', { className: 'chip' }, `Cleared • ${clearedAuctions.length}`),
-				el('span', { className: 'chip' }, `Closed • ${closedAuctions.length}`)
+				el('span', { className: 'chip chip--accent' }, `Збір заявок • ${collectingAuctions.length}`),
+				el('span', { className: 'chip' }, `Кліринг • ${clearedAuctions.length}`),
+				el('span', { className: 'chip' }, `Закрито • ${closedAuctions.length}`)
 			);
 			return chips;
 		})()
 	);
 	const listWrap = el('div', { className: 'stack-grid' });
 	if (!auctions.length) {
-		listWrap.textContent = 'Аукціонів ще не створено';
+		listWrap.textContent = 'Аукціони ще не створено';
 	} else {
 		auctions.forEach(a => listWrap.appendChild(auctionRow(a)));
 	}
@@ -587,7 +587,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 	const session = await initAccessControl({
 		requireAdmin: true,
 		redirectTo: 'account.html',
-		onDenied: () => alert('Admin access required.'),
+		onDenied: () => alert('Потрібен доступ адміністратора.'),
 	});
 	if (!session?.user) return;
 	currentUser = session.user;
@@ -600,7 +600,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 			const strong = document.createElement('strong');
 			strong.textContent = session.user.username;
 			const fragments = [
-				document.createTextNode('Logged in as '),
+				document.createTextNode('Увійшли як '),
 				strong
 			];
 			const profile = profileInfo?.profile;
@@ -619,7 +619,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 			link.href = 'profile.html';
 			link.className = 'btn';
 			link.style.marginLeft = '8px';
-			link.textContent = 'Open Profile';
+			link.textContent = 'Відкрити профіль';
 			box.appendChild(link);
 		}
 	} catch {}

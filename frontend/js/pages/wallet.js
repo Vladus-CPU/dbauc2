@@ -90,7 +90,7 @@ async function renderWalletPage() {
       return balances;
     } catch (error) {
       summaryRoot.textContent = 'Не вдалося завантажити баланс.';
-      console.error('Failed to fetch wallet balance', error);
+      console.error('Не вдалося завантажити баланс', error);
       throw error;
     }
   }
@@ -102,7 +102,7 @@ async function renderWalletPage() {
       renderTransactions(rows);
     } catch (error) {
       transactionsRoot.textContent = 'Не вдалося завантажити транзакції.';
-      console.error('Failed to fetch wallet transactions', error);
+      console.error('Не вдалося завантажити транзакції', error);
     }
   }
 
