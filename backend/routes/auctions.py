@@ -1,5 +1,6 @@
 import datetime
 import os
+import time
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 from flask import Blueprint, current_app, g, jsonify, request, send_from_directory
@@ -8,6 +9,7 @@ from ..db import (
     ensure_auctions_tables,
     ensure_listings_table,
     ensure_users_table,
+    ensure_user_profiles,
 )
 from ..errors import AppError, DBError, OrderDataError
 from ..security import get_auth_user, require_admin
@@ -200,7 +202,6 @@ def auction_order_book(auction_id: int):
         depth_imbalance = None
         if isinstance(best_bid_depth, float) and isinstance(best_ask_depth, float) and (best_bid_depth + best_ask_depth) > 0:
             depth_imbalance = (best_bid_depth - best_ask_depth) / (best_bid_depth + best_ask_depth)
-        # Cumulative depth (top 3 levels) for additional liquidity context
         top_n = 3
         cum_bid_depth = sum((lvl['totalQuantity'] for lvl in bid_levels[:top_n]), 0.0) if bid_levels else None
         cum_ask_depth = sum((lvl['totalQuantity'] for lvl in ask_levels[:top_n]), 0.0) if ask_levels else None
@@ -820,3 +821,135 @@ def download_auction_document(auction_id: int, filename: str):
     if not os.path.isdir(base_dir):
         raise AppError("Not found", statuscode=404)
     return send_from_directory(base_dir, filename, as_attachment=True)
+
+@auctions_bp.post('/admin/auctions/<int:auction_id>/seed_random')
+@require_admin
+def seed_random_orders(auction_id: int):
+    """Create N random trader users (if needed) and place random bid/ask orders for the auction.
+
+    Body JSON (all optional):
+      count: int (default 5) - how many traders to generate
+      bidsPerTrader: int (default 1)
+      asksPerTrader: int (default 1)
+      priceCenter: float (optional) - central reference price; if absent uses mid of existing best bid/ask or random 90..110
+      priceSpread: float (default 5) - max +/- deviation from center (percent)
+      quantityMin: float (default 1)
+      quantityMax: float (default 10)
+
+    Returns summary of created users and orders.
+    """
+    data = request.get_json(silent=True) or {}
+    count = int(data.get('count') or 5)
+    bids_per = int(data.get('bidsPerTrader') or 1)
+    asks_per = int(data.get('asksPerTrader') or 1)
+    price_spread_pct = float(data.get('priceSpread') or 5.0)
+    qty_min = float(data.get('quantityMin') or 1.0)
+    qty_max = float(data.get('quantityMax') or 10.0)
+    if count < 1 or count > 200:
+        raise AppError("count out of range (1..200)", statuscode=400)
+    if qty_min <= 0 or qty_max <= 0 or qty_min > qty_max:
+        raise AppError("Invalid quantity range", statuscode=400)
+
+    conn = db_connection()
+    cur = conn.cursor(dictionary=True)
+    try:
+        ensure_users_table(conn)
+        ensure_user_profiles(conn)
+        ensure_auctions_tables(conn)
+        # Validate auction status
+        cur.execute("SELECT id, status, type FROM auctions WHERE id=%s", (auction_id,))
+        auction = cur.fetchone()
+        if not auction:
+            raise AppError("Auction not found", statuscode=404)
+        if auction['status'] != 'collecting':
+            raise AppError("Auction not collecting orders", statuscode=400)
+
+        # Fetch current best bid/ask for center heuristic if needed
+        cur.execute("SELECT MAX(price) as bb FROM auction_orders WHERE auction_id=%s AND side='bid' AND status='open'", (auction_id,))
+        best_bid = cur.fetchone()['bb']
+        cur.execute("SELECT MIN(price) as ba FROM auction_orders WHERE auction_id=%s AND side='ask' AND status='open'", (auction_id,))
+        best_ask = cur.fetchone()['ba']
+        price_center = data.get('priceCenter')
+        if price_center is None:
+            try:
+                if best_bid and best_ask:
+                    price_center = (float(best_bid) + float(best_ask)) / 2.0
+                elif best_bid:
+                    price_center = float(best_bid)
+                elif best_ask:
+                    price_center = float(best_ask)
+                else:
+                    price_center = 100.0
+            except Exception:
+                price_center = 100.0
+        price_center = float(price_center)
+
+        created = []
+        order_rows = []
+        # Simple password hash reuse (bcrypt) via auth route code path is avoided; create directly.
+        from passlib.hash import bcrypt
+        for i in range(count):
+            username = f"bot_{int(time.time())}_{os.urandom(3).hex()}_{i}"[:60]
+            pwd_hash = bcrypt.hash('password')
+            # Create user
+            cur.execute(
+                "INSERT INTO users (username, password_hash, is_admin) VALUES (%s,%s,%s)",
+                (username, pwd_hash, 0)
+            )
+            user_id = cur.lastrowid
+            cur.execute(
+                "INSERT INTO traders_profile (user_id, first_name, last_name) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE first_name=VALUES(first_name), last_name=VALUES(last_name)",
+                (user_id, 'Bot', 'Trader')
+            )
+            # Auto approve participation for closed auctions requirement
+            cur.execute(
+                "INSERT INTO auction_participants (auction_id, trader_id, status) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE status=VALUES(status)",
+                (auction_id, user_id, 'approved')
+            )
+            created.append(user_id)
+            # Generate bid & ask orders
+            import random
+            for _ in range(bids_per):
+                price_delta = price_center * (random.uniform(-price_spread_pct, price_spread_pct) / 100.0)
+                price = max(0.000001, price_center + price_delta)
+                qty = random.uniform(qty_min, qty_max)
+                cur.execute(
+                    "INSERT INTO auction_orders (auction_id, trader_id, side, price, quantity) VALUES (%s,%s,'bid',%s,%s)",
+                    (auction_id, user_id, price, qty)
+                )
+                order_rows.append({"side": "bid", "price": price, "quantity": qty})
+            for _ in range(asks_per):
+                price_delta = price_center * (random.uniform(-price_spread_pct, price_spread_pct) / 100.0)
+                price = max(0.000001, price_center + price_delta)
+                qty = random.uniform(qty_min, qty_max)
+                cur.execute(
+                    "INSERT INTO auction_orders (auction_id, trader_id, side, price, quantity) VALUES (%s,%s,'ask',%s,%s)",
+                    (auction_id, user_id, price, qty)
+                )
+                order_rows.append({"side": "ask", "price": price, "quantity": qty})
+        conn.commit()
+        return jsonify({
+            "message": "Seeded random orders",
+            "auctionId": auction_id,
+            "createdUsers": created,
+            "orders": order_rows,
+            "priceCenter": price_center
+        })
+    except AppError:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise DBError("Error seeding random orders", details=str(e))
+    finally:
+        try:
+            cur.close()
+        except Exception:
+            pass
+        conn.close()
