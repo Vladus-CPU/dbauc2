@@ -45,6 +45,32 @@ function statusLabel(status) {
   }
 }
 
+const state = {
+  all: [],
+  filtered: [],
+  historySlice: 6,
+  autoTimer: null,
+  nextRefreshAt: null,
+  lastUpdated: null,
+  filters: { search: '', status: 'all' },
+  session: null,
+};
+
+function applyFilters() {
+  const { search, status } = state.filters;
+  const norm = (s) => s.toString().toLowerCase();
+  state.filtered = state.all.filter(a => {
+    if (status !== 'all' && a.status !== status) return false;
+    if (search) {
+      const s = norm(search);
+      const idMatch = String(a.id).includes(s);
+      const prodMatch = norm(a.product || '').includes(s);
+      if (!idMatch && !prodMatch) return false;
+    }
+    return true;
+  });
+}
+
 function updateMetrics(auctions) {
   const metricsRoot = document.getElementById('auction-metrics');
   if (!metricsRoot) return;
@@ -254,49 +280,112 @@ function createHistoryCard(auction) {
   return card;
 }
 
-async function render(session) {
+function renderLists() {
   const collectingList = document.getElementById('collecting-list');
   const clearedList = document.getElementById('cleared-list');
-  collectingList.textContent = 'Завантаження…';
-  clearedList.textContent = 'Завантаження…';
-
-  let auctions = [];
-  try {
-    auctions = await listAuctions();
-  } catch (error) {
-    console.error('Failed to load auctions', error);
-    collectingList.textContent = 'Не вдалося завантажити аукціони';
-    clearedList.textContent = 'Не вдалося завантажити аукціони';
-    return;
-  }
-
+  if (!collectingList || !clearedList) return;
+  const auctions = state.filtered;
   updateMetrics(auctions);
-  updateHero(session);
-
   const collecting = auctions.filter(a => a.status === 'collecting');
   const history = auctions.filter(a => a.status === 'cleared' || a.status === 'closed');
-
   collectingList.innerHTML = '';
   if (!collecting.length) {
     collectingList.textContent = 'Наразі немає активних вікон.';
   } else {
-    const refresh = () => render(session);
-    collecting.forEach((auction) => {
-      collectingList.appendChild(createCollectingCard(auction, session, refresh));
+    const refresh = softRefresh; // partial refresh
+    collecting.forEach(a => {
+      const card = createCollectingCard(a, state.session, refresh);
+      if (a.status === 'collecting') card.classList.add('collecting-highlight');
+      collectingList.appendChild(card);
     });
   }
-
   clearedList.innerHTML = '';
   if (!history.length) {
     clearedList.textContent = 'Ще немає завершених аукціонів.';
   } else {
-    history.slice(0, 6).forEach((auction) => {
-      clearedList.appendChild(createHistoryCard(auction));
-    });
+    history.slice(0, state.historySlice).forEach(a => clearedList.appendChild(createHistoryCard(a)));
+  }
+  announce(`Оновлено: активні ${collecting.length}, історія ${history.length}`);
+  updateLastUpdated();
+}
+
+function updateLastUpdated(){
+  const elTime = document.getElementById('auction-last-updated');
+  if (!elTime) return;
+  if (!state.lastUpdated){ elTime.textContent='—'; return; }
+  elTime.textContent = new Date(state.lastUpdated).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+function scheduleAuto(){
+  clearTimeout(state.autoTimer);
+  const auto = document.getElementById('auction-auto-refresh');
+  if (!auto || !auto.checked) return;
+  const NEXT_MS = 30000;
+  state.nextRefreshAt = Date.now() + NEXT_MS;
+  const countdownEl = document.getElementById('auction-refresh-countdown');
+  if (countdownEl){ countdownEl.hidden=false; }
+  function tick(){
+    const left = state.nextRefreshAt - Date.now();
+    if (left <= 0){ hardRefresh(); return; }
+    if (countdownEl) countdownEl.textContent = `оновлення через ${(left/1000).toFixed(0)}с`;
+    state.autoTimer = setTimeout(tick, 1000);
+  }
+  tick();
+}
+
+async function hardRefresh(){
+  const collectingList = document.getElementById('collecting-list');
+  const clearedList = document.getElementById('cleared-list');
+  if (collectingList) collectingList.textContent='Завантаження…';
+  if (clearedList) clearedList.textContent='Завантаження…';
+  try{
+    state.all = await listAuctions();
+    state.lastUpdated = Date.now();
+    applyFilters();
+    renderLists();
+  }catch(e){
+    console.error('Failed to load auctions', e);
+    if (collectingList) collectingList.textContent='Помилка завантаження';
+    if (clearedList) clearedList.textContent='Помилка завантаження';
+  } finally {
+    scheduleAuto();
   }
 }
 
+async function softRefresh(){
+  // Soft refresh only updates underlying data but keeps filters & slice
+  try{
+    const updated = await listAuctions();
+    state.all = updated;
+    state.lastUpdated = Date.now();
+    applyFilters();
+    renderLists();
+  }catch(e){ console.warn('Soft refresh failed', e); }
+}
+
+function announce(msg){
+  const box = document.getElementById('auctions-announcer');
+  if (box){ box.textContent = msg; }
+}
+
+function attachUI(){
+  const search = document.getElementById('auction-filter-search');
+  const statusSel = document.getElementById('auction-filter-status');
+  const refreshBtn = document.getElementById('auction-refresh-btn');
+  const auto = document.getElementById('auction-auto-refresh');
+  const expandBtn = document.getElementById('history-expand-btn');
+  if (search){
+    let t; search.addEventListener('input', (e)=>{ clearTimeout(t); t=setTimeout(()=>{ state.filters.search=e.target.value.trim(); applyFilters(); renderLists(); },300);});
+  }
+  if (statusSel){ statusSel.addEventListener('change', e=>{ state.filters.status=e.target.value; applyFilters(); renderLists(); }); }
+  if (refreshBtn){ refreshBtn.addEventListener('click', ()=> hardRefresh()); }
+  if (auto){ auto.addEventListener('change', ()=> { scheduleAuto(); }); }
+  if (expandBtn){ expandBtn.addEventListener('click', ()=> { const expanded = expandBtn.getAttribute('aria-expanded')==='true'; expandBtn.setAttribute('aria-expanded', String(!expanded)); state.historySlice = expanded?6:30; renderLists(); }); }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
-  const session = await initAccessControl();
-  await render(session);
+  state.session = await initAccessControl();
+  updateHero(state.session);
+  attachUI();
+  await hardRefresh();
 });
