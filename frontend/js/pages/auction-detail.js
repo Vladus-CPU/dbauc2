@@ -250,8 +250,8 @@ async function fetchHistory() {
   } catch { return null; }
 }
 
-function buildLine(pts, {w=300,h=80,stroke='#66c0f4'}={}) {
-  if (!pts || pts.length < 2) return `<svg width="${w}" height="${h}" class="micro-chart"></svg>`;
+function buildLine(pts, {w=340,h=90,stroke='#66c0f4'}={}) {
+  if (!pts || pts.length < 2) return `<div class="chart-empty">—</div>`;
   const ys = pts.map(p=>p.price);
   const minY = Math.min(...ys), maxY = Math.max(...ys), span = maxY-minY||1;
   const coords = pts.map((p,i)=>{
@@ -259,13 +259,13 @@ function buildLine(pts, {w=300,h=80,stroke='#66c0f4'}={}) {
     const y = h-2-((p.price-minY)/span)*(h-4);
     return `${x.toFixed(2)},${y.toFixed(2)}`;
   }).join(' ');
-  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="micro-chart" preserveAspectRatio="none"><polyline points="${coords}" fill="none" stroke="${stroke}" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="micro-chart micro-chart--line" preserveAspectRatio="none"><polyline points="${coords}" fill="none" stroke="${stroke}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 }
 
-function buildDepth(curve, {w=300,h=110}={}) {
-  const bids = (curve?.bids||[]).slice(0,50);
-  const asks = (curve?.asks||[]).slice(0,50);
-  if (!bids.length && !asks.length) return '<div class="muted">Немає глибини</div>';
+function buildDepth(curve, {w=340,h=110,midPrice=null}={}) {
+  const bids = (curve?.bids||[]).slice(0,60);
+  const asks = (curve?.asks||[]).slice(0,60);
+  if (!bids.length && !asks.length) return '<div class="chart-empty">—</div>';
   const prices = [...bids.map(b=>b.price),...asks.map(a=>a.price)];
   const cumVals = [...bids.map(b=>b.cum),...asks.map(a=>a.cum)];
   const minP=Math.min(...prices), maxP=Math.max(...prices), maxCum=Math.max(...cumVals,1);
@@ -275,9 +275,10 @@ function buildDepth(curve, {w=300,h=110}={}) {
   const mkPath=(arr)=>arr.map((pt,i)=>`${i?'L':'M'}${sx(pt.price).toFixed(2)},${sy(pt.cum).toFixed(2)}`).join(' ');
   const bidPath = mkPath(bids);
   const askPath = mkPath(asks);
-  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="micro-chart" preserveAspectRatio="none">
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="micro-chart micro-chart--depth" preserveAspectRatio="none">
     <path d="${bidPath}" fill="none" stroke="#2ecc71" stroke-width="1.5"/>
     <path d="${askPath}" fill="none" stroke="#ff7676" stroke-width="1.5"/>
+    ${midPrice!==null?`<line x1="${sx(midPrice).toFixed(2)}" y1="0" x2="${sx(midPrice).toFixed(2)}" y2="${h}" stroke="#9ca3af" stroke-dasharray="4 4" stroke-width="1" opacity="0.7"/>`:''}
   </svg>`;
 }
 
@@ -286,15 +287,31 @@ async function updateHistoryCharts() {
   const data = await fetchHistory();
   if (!data) return;
   const prices = (data.clearedSeries||[]).filter(p=>typeof p.price==='number');
+  const lastPrice = prices.length? prices[prices.length-1].price : null;
+  const firstPrice = prices.length? prices[0].price : null;
+  const changeAbs = (lastPrice!==null && firstPrice!==null)? (lastPrice-firstPrice) : null;
+  const changePct = (changeAbs!==null && firstPrice)? (changeAbs/firstPrice)*100 : null;
+  const mid = window.__lastBook?.metrics?.midPrice ?? null;
+  const bidDepthTotal = data.bookCurve?.bids?.length? data.bookCurve.bids[data.bookCurve.bids.length-1].cum : 0;
+  const askDepthTotal = data.bookCurve?.asks?.length? data.bookCurve.asks[data.bookCurve.asks.length-1].cum : 0;
+  const depthShareBid = bidDepthTotal+askDepthTotal? (bidDepthTotal/(bidDepthTotal+askDepthTotal))*100 : null;
   historyChartsEl.innerHTML = `
-    <div style="display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start;">
-      <div>
-        <div class="muted" style="font-size:0.65rem;margin-bottom:4px;letter-spacing:0.08em;">Ціни клірингу</div>
-        ${buildLine(prices,{})}
+    <div class="charts-row">
+      <div class="mini-chart">
+        <div class="mini-chart__header">
+          <span class="mini-chart__title">Ціни клірингу</span>
+          <span class="mini-chart__stat">${lastPrice!==null?formatPrice(lastPrice):'—'}${changeAbs!==null?` <span class="${changeAbs>0?'pos':'neg'}">(${changeAbs>0?'+':''}${formatPrice(changeAbs)}${changePct!==null?` / ${changePct>0?'+':''}${formatNumber(changePct,{maximumFractionDigits:1})}%`:''})</span>`:''}</span>
+        </div>
+        <div class="mini-chart__body">${buildLine(prices,{})}</div>
+        <div class="mini-chart__footer">Діапазон: ${firstPrice!==null?formatPrice(Math.min(firstPrice,lastPrice)):'—'} – ${lastPrice!==null?formatPrice(Math.max(firstPrice,lastPrice)):'—'}</div>
       </div>
-      <div>
-        <div class="muted" style="font-size:0.65rem;margin-bottom:4px;letter-spacing:0.08em;">Кумулятивна глибина</div>
-        ${buildDepth(data.bookCurve,{})}
+      <div class="mini-chart">
+        <div class="mini-chart__header">
+          <span class="mini-chart__title">Кумулятивна глибина</span>
+          <span class="mini-chart__stat">Bid ${formatQty(bidDepthTotal)} · Ask ${formatQty(askDepthTotal)}${mid!==null?` · Mid ${formatPrice(mid)}`:''}</span>
+        </div>
+        <div class="mini-chart__body">${buildDepth(data.bookCurve,{midPrice:mid})}</div>
+        <div class="mini-chart__footer">Співвідн.: ${depthShareBid!==null?formatNumber(depthShareBid,{maximumFractionDigits:1}):'—'}% bid / ${depthShareBid!==null?formatNumber(100-depthShareBid,{maximumFractionDigits:1}):'—'}% ask</div>
       </div>
     </div>`;
 }
