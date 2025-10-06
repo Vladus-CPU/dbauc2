@@ -40,6 +40,7 @@ let __pendingHistory = null;
 let __pendingDistribution = null;
 // Track active tab id
 let __activeTab = 'tab-book';
+let __refreshInFlight = false;
 
 function formatNumber(value, options = {}) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
@@ -611,6 +612,8 @@ async function load(seq) {
 
 // Unified refresh orchestrator
 async function refreshAll({forceHistory=false, forceDistribution=false}={}) {
+  if (__refreshInFlight) return; // drop if still processing (UI will catch up next interval)
+  __refreshInFlight = true;
   const seq = ++__refreshSeq;
   // Always refresh book first (may update metrics used by others)
   await load(seq);
@@ -622,6 +625,7 @@ async function refreshAll({forceHistory=false, forceDistribution=false}={}) {
     // still update history occasionally (background) without force
     updateHistoryCharts(false, seq);
   }
+  __refreshInFlight = false;
 }
 
 refreshBtn.addEventListener('click', () => { refreshAll({forceHistory:true, forceDistribution:true}).then(()=> showToast('Оновлено', 'info')); });
