@@ -1,6 +1,7 @@
 import {getAuctionBook, getMe, joinAuction, myParticipationStatus, placeAuctionOrder,} from '../api.js';
 import { showToast } from '../ui/toast.js';
 import { initAccessControl } from '../ui/session.js';
+import { tStatus, tSide, localizeErrorMessage } from '../ui/i18n.js';
 
 const params = new URLSearchParams(window.location.search);
 const auctionId = Number(params.get('id'));
