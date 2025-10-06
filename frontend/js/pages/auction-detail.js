@@ -118,30 +118,9 @@ function renderSummary(book) {
 function renderBook(book) {
   bidsBody.innerHTML = '';
   asksBody.innerHTML = '';
-  // Group raw levels into 0.1 (1 decimal) buckets so UI rounding does not produce duplicate rows
-  const groupLevels = (levels, side) => {
-    const map = new Map();
-    levels.forEach(l => {
-      const bucket = Number((Math.round(l.price * 10) / 10).toFixed(1)); // 1 decimal bucket
-      const key = bucket.toFixed(1);
-      if (!map.has(key)) {
-        map.set(key, { price: bucket, totalQuantity: 0, orderCount: 0 });
-      }
-      const tgt = map.get(key);
-      tgt.totalQuantity += (l.totalQuantity || 0);
-      tgt.orderCount += (l.orderCount || 0);
-    });
-    // Sort bids desc, asks asc
-    const arr = Array.from(map.values()).sort((a,b)=> side==='bid'? b.price - a.price : a.price - b.price);
-    // Recompute cumulative
-    let cum = 0;
-    arr.forEach(l => { cum += l.totalQuantity; l.cumulativeQuantity = cum; });
-    return arr;
-  };
-  const rawBids = book.book.bids || [];
-  const rawAsks = book.book.asks || [];
-  const bidLevels = groupLevels(rawBids, 'bid').slice(0, 15);
-  const askLevels = groupLevels(rawAsks, 'ask').slice(0, 15);
+  // Use backend-provided aggregated levels (already grouped per exact price)
+  const bidLevels = (book.book.bids || []).slice(0, 15); // sorted desc by backend
+  const askLevels = (book.book.asks || []).slice(0, 15); // sorted asc by backend
   const maxBidCum = Math.max(...bidLevels.map(l => l.cumulativeQuantity || 0), 0);
   const maxAskCum = Math.max(...askLevels.map(l => l.cumulativeQuantity || 0), 0);
   bidLevels.forEach((level) => {
@@ -150,9 +129,9 @@ function renderBook(book) {
     const depthPct = maxBidCum ? (level.cumulativeQuantity / maxBidCum) * 100 : 0;
     tr.innerHTML = `
       <td class="depth-cell"><div class="depth-bar depth-bar--bid" style="--d:${depthPct.toFixed(2)}%"></div><span>${formatPrice(level.price)}</span></td>
-      <td>${formatQty(level.totalQuantity)}</td>
-      <td>${level.orderCount}</td>
-      <td>${formatQty(level.cumulativeQuantity)}</td>
+      <td class="num">${formatQty(level.totalQuantity)}</td>
+      <td class="num">${level.orderCount}</td>
+      <td class="num">${formatQty(level.cumulativeQuantity)}</td>
     `;
     bidsBody.append(tr);
   });
@@ -162,9 +141,9 @@ function renderBook(book) {
     const depthPct = maxAskCum ? (level.cumulativeQuantity / maxAskCum) * 100 : 0;
     tr.innerHTML = `
       <td class="depth-cell"><div class="depth-bar depth-bar--ask" style="--d:${depthPct.toFixed(2)}%"></div><span>${formatPrice(level.price)}</span></td>
-      <td>${formatQty(level.totalQuantity)}</td>
-      <td>${level.orderCount}</td>
-      <td>${formatQty(level.cumulativeQuantity)}</td>
+      <td class="num">${formatQty(level.totalQuantity)}</td>
+      <td class="num">${level.orderCount}</td>
+      <td class="num">${formatQty(level.cumulativeQuantity)}</td>
     `;
     asksBody.append(tr);
   });
