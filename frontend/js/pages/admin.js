@@ -608,11 +608,11 @@ async function render() {
 						</label>
 						<label style="display:flex;flex-direction:column;font-size:0.7rem;gap:2px;">
 							<span>Qty min</span>
-							<input name="quantityMin" type="number" min="0" step="0.01" value="1" class="form__input" style="width:80px;" title="Мінімальна кількість. Крок 0.01 (змінено щоб уникнути помилки кроку)">
+							<input name="quantityMin" type="number" min="0" value="1" class="form__input" style="width:80px;" title="Мінімальна кількість. Дозволено довільні дробові значення">
 						</label>
 						<label style="display:flex;flex-direction:column;font-size:0.7rem;gap:2px;">
 							<span>Qty max</span>
-							<input name="quantityMax" type="number" min="0" step="0.01" value="10" class="form__input" style="width:80px;" title="Максимальна кількість. Крок 0.01 (змінено щоб уникнути помилки кроку)">
+							<input name="quantityMax" type="number" min="0" value="10" class="form__input" style="width:80px;" title="Максимальна кількість. Дозволено довільні дробові значення">
 						</label>
 						<button type="submit" class="btn btn-primary btn-compact" style="margin-left:4px;">Згенерувати</button>
 						<button type="button" data-role="refresh-orders" class="btn btn-ghost btn-compact" title="Оновити дані">↻</button>
