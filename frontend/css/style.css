@@ -13,7 +13,8 @@
 @import url("./modules/dashboard.css");
 @import url("./modules/forms.css");
 @import url("./modules/inventory.css");
-@import url("./auction-detail.css");
+/* Auction / market styles moved into modules/market.css (avoid double inclusion). */
+@import url("./modules/market.css");
 
 .metrics-grid {
 	display: grid;
