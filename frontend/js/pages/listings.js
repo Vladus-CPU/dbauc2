@@ -7,9 +7,11 @@ import {
     patchListing,
     deleteListing,
     createListingAuction,
+    listAuctions,
 } from '../api.js';
 import { showToast } from '../ui/toast.js';
 import { initAccessControl } from '../ui/session.js';
+import { debounce, createLocker, withButtonLoading } from '../lib/asyncUtils.js';
 
 const statusLabels = {
     draft: 'Чернетка',
@@ -99,6 +101,9 @@ const els = {
     listingIdInput: document.getElementById('listing-id'),
 };
 
+// Global action locker to avoid overlapping network mutations
+const withLock = createLocker();
+
 function formatCurrency(value) {
     if (value === null || value === undefined || Number.isNaN(Number(value))) {
         return '—';
@@ -122,13 +127,7 @@ function formatDateTime(value) {
     }
 }
 
-function debounce(fn, wait = 350) {
-    let timer = null;
-    return (...args) => {
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(() => fn(...args), wait);
-    };
-}
+// (Using shared debounce from asyncUtils.js)
 
 function setTableLoading(isLoading) {
     if (!els.tableBody) return;
@@ -230,14 +229,18 @@ function renderTable() {
         const actionsWrap = document.createElement('div');
         actionsWrap.className = 'inventory-actions';
 
+        // Determine next status action config
+        const statusConfig = nextStatusConfig[item.status] || nextStatusConfig.draft;
+
+        // Edit button (explicit edit action)
         const editBtn = document.createElement('button');
         editBtn.type = 'button';
-        editBtn.className = 'btn btn-ghost';
         editBtn.dataset.action = 'edit';
+        editBtn.className = 'btn btn-ghost';
         editBtn.textContent = 'Редагувати';
         actionsWrap.appendChild(editBtn);
 
-        const statusConfig = nextStatusConfig[item.status] || nextStatusConfig.draft;
+        // Status change button
         const statusBtn = document.createElement('button');
         statusBtn.type = 'button';
         statusBtn.dataset.action = 'status';
@@ -246,6 +249,7 @@ function renderTable() {
         statusBtn.textContent = statusConfig.label;
         actionsWrap.appendChild(statusBtn);
 
+        // Delete button
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
         deleteBtn.dataset.action = 'delete';
@@ -358,15 +362,15 @@ async function refreshInventorySummary() {
     try {
         const summary = await getListingSummary(params);
         if (requestId !== summaryRequestId) {
-            return;
+            return; // stale response
         }
         applyInventorySummary(summary);
     } catch (error) {
         if (requestId === summaryRequestId) {
             console.error('Failed to load listing summary', error);
             const fallbackCounts = state.items.reduce((acc, item) => {
-                const status = item.status || 'draft';
-                acc[status] = (acc[status] || 0) + 1;
+                const st = item.status || 'draft';
+                acc[st] = (acc[st] || 0) + 1;
                 return acc;
             }, {});
             applyInventorySummary({
@@ -503,6 +507,59 @@ async function loadListings({ preserveSelection = true } = {}) {
         });
         state.items = Array.isArray(result.items) ? result.items : Array.isArray(result) ? result : [];
         state.total = typeof result.total === 'number' ? result.total : state.items.length;
+
+        // --- Extra merge: include auctions created поза сторінкою listing.html ---
+        // Rationale: адміністратор може створити аукціон через admin панель (createAuction)
+        // без прямого зв'язку із listingId. Ми намагаємось прив'язати такі аукціони
+        // до лоту за збігом назви (title == product) без врахування регістру та пробілів.
+        // Обмеження: можливі колізії якщо різні лоти мають однакову назву.
+        try {
+            const allAuctions = await listAuctions().catch(() => []);
+            const norm = (s) => (s || '').toString().trim().toLowerCase();
+            const auctionsByProduct = new Map();
+            for (const a of allAuctions) {
+                const key = norm(a.product);
+                if (!auctionsByProduct.has(key)) auctionsByProduct.set(key, []);
+                auctionsByProduct.get(key).push(a);
+            }
+            // Sort each bucket by created_at/window_start (newest first)
+            for (const bucket of auctionsByProduct.values()) {
+                bucket.sort((a,b)=>{
+                    const da = new Date(a.window_start || a.created_at || 0).getTime();
+                    const db = new Date(b.window_start || b.created_at || 0).getTime();
+                    return db - da; // descending
+                });
+            }
+            state.items = state.items.map(item => {
+                const key = norm(item.title);
+                const bucket = auctionsByProduct.get(key);
+                if (!bucket || !bucket.length) return item;
+                const extCount = bucket.length;
+                const newest = bucket[0];
+                const currentCount = Number(item.auctionCount || 0);
+                // If existing count already >= external count we assume backend already linked.
+                const mergedCount = currentCount >= extCount ? currentCount : extCount;
+                // Decide last auction: pick the most recent between item.lastAuction and newest external
+                let lastAuction = item.lastAuction || null;
+                const lastTime = lastAuction ? new Date(lastAuction.createdAt || lastAuction.window_start || 0).getTime() : 0;
+                const newestTime = new Date(newest.window_start || newest.created_at || 0).getTime();
+                if (newestTime > lastTime) {
+                    lastAuction = {
+                        id: newest.id,
+                        status: newest.status,
+                        createdAt: newest.created_at || newest.window_start || newest.updated_at,
+                    };
+                }
+                return {
+                    ...item,
+                    auctionCount: mergedCount,
+                    lastAuction,
+                };
+            });
+        } catch (mergeErr) {
+            console.warn('Не вдалося синхронізувати зовнішні аукціони з лотами', mergeErr);
+        }
+
         renderTable();
         renderPagination();
         updateInventorySummary();
