@@ -614,6 +614,14 @@ async function render() {
 							<span>Qty max</span>
 							<input name="quantityMax" type="number" min="0" value="10" class="form__input" style="width:80px;" title="Максимальна кількість. Дозволено довільні дробові значення">
 						</label>
+							<label style="display:flex;flex-direction:column;font-size:0.7rem;gap:2px;">
+								<span>Ціна центр</span>
+								<input name="priceCenter" type="number" min="0" step="0.0001" placeholder="auto" class="form__input" style="width:90px;" title="Опціонально фіксувати центральну ціну">
+							</label>
+							<label style="display:flex;align-items:center;font-size:0.65rem;gap:4px;margin-left:4px;">
+								<input name="allowCross" type="checkbox" value="1" style="scale:1.1;">
+								<span>Дозволити перехрещення</span>
+							</label>
 						<button type="submit" class="btn btn-primary btn-compact" style="margin-left:4px;">Згенерувати</button>
 						<button type="button" data-role="refresh-orders" class="btn btn-ghost btn-compact" title="Оновити дані">↻</button>
 						<button type="button" data-role="cleanup-bots" class="btn btn-ghost btn-compact" title="Очистити ботів">🗑</button>
@@ -637,7 +645,9 @@ async function render() {
 				seedForm.addEventListener('submit', async (ev) => {
 					ev.preventDefault();
 					const fd = new FormData(seedForm);
-					const payload = Object.fromEntries([...fd.entries()].map(([k,v]) => [k, v === '' ? undefined : (isNaN(Number(v))? v : Number(v))]));
+					let payload = Object.fromEntries([...fd.entries()].map(([k,v]) => [k, v === '' ? undefined : (isNaN(Number(v))? v : Number(v))]));
+					// Normalize checkbox allowCross => boolean
+					payload.allowCross = !!fd.get('allowCross');
 					statusEl.textContent = 'Створення...';
 					try {
 						await seedRandomAuctionOrders(a.id, payload);
