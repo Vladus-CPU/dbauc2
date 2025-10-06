@@ -118,8 +118,30 @@ function renderSummary(book) {
 function renderBook(book) {
   bidsBody.innerHTML = '';
   asksBody.innerHTML = '';
-  const bidLevels = (book.book.bids || []).slice(0, 15);
-  const askLevels = (book.book.asks || []).slice(0, 15);
+  // Group raw levels into 0.1 (1 decimal) buckets so UI rounding does not produce duplicate rows
+  const groupLevels = (levels, side) => {
+    const map = new Map();
+    levels.forEach(l => {
+      const bucket = Number((Math.round(l.price * 10) / 10).toFixed(1)); // 1 decimal bucket
+      const key = bucket.toFixed(1);
+      if (!map.has(key)) {
+        map.set(key, { price: bucket, totalQuantity: 0, orderCount: 0 });
+      }
+      const tgt = map.get(key);
+      tgt.totalQuantity += (l.totalQuantity || 0);
+      tgt.orderCount += (l.orderCount || 0);
+    });
+    // Sort bids desc, asks asc
+    const arr = Array.from(map.values()).sort((a,b)=> side==='bid'? b.price - a.price : a.price - b.price);
+    // Recompute cumulative
+    let cum = 0;
+    arr.forEach(l => { cum += l.totalQuantity; l.cumulativeQuantity = cum; });
+    return arr;
+  };
+  const rawBids = book.book.bids || [];
+  const rawAsks = book.book.asks || [];
+  const bidLevels = groupLevels(rawBids, 'bid').slice(0, 15);
+  const askLevels = groupLevels(rawAsks, 'ask').slice(0, 15);
   const maxBidCum = Math.max(...bidLevels.map(l => l.cumulativeQuantity || 0), 0);
   const maxAskCum = Math.max(...askLevels.map(l => l.cumulativeQuantity || 0), 0);
   bidLevels.forEach((level) => {
