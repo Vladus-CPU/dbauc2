@@ -18,6 +18,8 @@ const recentOrdersEl = document.getElementById('recent-orders');
 const recentClearingEl = document.getElementById('recent-clearing');
 const clearingChartEl = document.getElementById('clearing-chart');
 const refreshBtn = document.getElementById('refresh-book');
+// Optional container for history charts (add a <div id="auction-history-charts"></div> in HTML where desired)
+const historyChartsEl = document.getElementById('auction-history-charts');
 
 if (!auctionId) {
   summaryEl.innerHTML = '<p class="error">Невірний ідентифікатор аукціону</p>';
@@ -247,6 +249,69 @@ function renderMetrics(book) {
     }
     metricsEl.append(dt, dd);
   });
+}
+
+// --------- History (price & depth) ---------
+let lastHistoryAt = 0;
+async function fetchHistory() {
+  if (!auctionId) return null;
+  const now = Date.now();
+  if (now - lastHistoryAt < 5000) return null; // throttle 5s
+  lastHistoryAt = now;
+  try {
+    const r = await fetch(`/api/auctions/${auctionId}/history`);
+    if (!r.ok) return null;
+    return await r.json();
+  } catch { return null; }
+}
+
+function buildLine(pts, {w=300,h=80,stroke='#66c0f4'}={}) {
+  if (!pts || pts.length < 2) return `<svg width="${w}" height="${h}" class="micro-chart"></svg>`;
+  const ys = pts.map(p=>p.price);
+  const minY = Math.min(...ys), maxY = Math.max(...ys), span = maxY-minY||1;
+  const coords = pts.map((p,i)=>{
+    const x = (i/(pts.length-1))*(w-2)+1;
+    const y = h-2-((p.price-minY)/span)*(h-4);
+    return `${x.toFixed(2)},${y.toFixed(2)}`;
+  }).join(' ');
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="micro-chart" preserveAspectRatio="none"><polyline points="${coords}" fill="none" stroke="${stroke}" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+
+function buildDepth(curve, {w=300,h=110}={}) {
+  const bids = (curve?.bids||[]).slice(0,50);
+  const asks = (curve?.asks||[]).slice(0,50);
+  if (!bids.length && !asks.length) return '<div class="muted">Немає глибини</div>';
+  const prices = [...bids.map(b=>b.price),...asks.map(a=>a.price)];
+  const cumVals = [...bids.map(b=>b.cum),...asks.map(a=>a.cum)];
+  const minP=Math.min(...prices), maxP=Math.max(...prices), maxCum=Math.max(...cumVals,1);
+  const pad=4;
+  const sx=p=>pad+((p-minP)/(maxP-minP||1))*(w-pad*2);
+  const sy=c=>h-pad-((c/maxCum)*(h-pad*2));
+  const mkPath=(arr)=>arr.map((pt,i)=>`${i?'L':'M'}${sx(pt.price).toFixed(2)},${sy(pt.cum).toFixed(2)}`).join(' ');
+  const bidPath = mkPath(bids);
+  const askPath = mkPath(asks);
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" class="micro-chart" preserveAspectRatio="none">
+    <path d="${bidPath}" fill="none" stroke="#2ecc71" stroke-width="1.5"/>
+    <path d="${askPath}" fill="none" stroke="#ff7676" stroke-width="1.5"/>
+  </svg>`;
+}
+
+async function updateHistoryCharts() {
+  if (!historyChartsEl) return;
+  const data = await fetchHistory();
+  if (!data) return;
+  const prices = (data.clearedSeries||[]).filter(p=>typeof p.price==='number');
+  historyChartsEl.innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;gap:18px;align-items:flex-start;">
+      <div>
+        <div class="muted" style="font-size:0.65rem;margin-bottom:4px;letter-spacing:0.08em;">Ціни клірингу</div>
+        ${buildLine(prices,{})}
+      </div>
+      <div>
+        <div class="muted" style="font-size:0.65rem;margin-bottom:4px;letter-spacing:0.08em;">Кумулятивна глибина</div>
+        ${buildDepth(data.bookCurve,{})}
+      </div>
+    </div>`;
 }
 
 function renderOrdersList(book) {
@@ -484,8 +549,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (document.hidden) return;
       if (isLoading) return;
       load();
+      updateHistoryCharts();
     }, 15000);
   }
+  // kick initial charts
+  updateHistoryCharts();
   window.addEventListener('beforeunload', () => {
     if (window.__auctionRefreshTimer) {
       clearInterval(window.__auctionRefreshTimer);
