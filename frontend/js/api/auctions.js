@@ -74,3 +74,22 @@ export async function cleanupAuctionBots(auctionId, options = {}) {
     }
     return res.json();
 }
+
+export async function purgeAllBots(options = {}) {
+    const res = await authorizedFetch(`/api/admin/bots/purge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(options)
+    });
+    if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`Не вдалося видалити всіх ботів: ${res.status} ${txt}`);
+    }
+    return res.json();
+}
+
+export async function fetchPriceDistribution(auctionId) {
+    const res = await fetch(resolveApiUrl(`/api/auctions/${auctionId}/distribution`));
+    if (!res.ok) throw new Error(`Не вдалося отримати розподіл цін: ${res.status}`);
+    return res.json();
+}

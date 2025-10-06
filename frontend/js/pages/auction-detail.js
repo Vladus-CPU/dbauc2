@@ -20,6 +20,7 @@ const clearingChartEl = document.getElementById('clearing-chart');
 const refreshBtn = document.getElementById('refresh-book');
 // Optional container for history charts (add a <div id="auction-history-charts"></div> in HTML where desired)
 const historyChartsEl = document.getElementById('auction-history-charts');
+const priceDistEl = document.getElementById('price-distribution');
 
 if (!auctionId) {
   summaryEl.innerHTML = '<p class="error">Невірний ідентифікатор аукціону</p>';
@@ -314,6 +315,37 @@ async function updateHistoryCharts() {
     </div>`;
 }
 
+// --------- Price distribution (Steam-like depth bars) ---------
+async function updatePriceDistribution() {
+  if (!priceDistEl) return;
+  try {
+    const res = await fetch(`/api/auctions/${auctionId}/distribution`);
+    if (!res.ok) return;
+    const dist = await res.json();
+    const { bids=[], asks=[], mid } = dist;
+    const maxQty = Math.max(...bids.map(b=>b.qty), ...asks.map(a=>a.qty), 1);
+    const row = (side, o) => {
+      const pct = (o.qty / maxQty) * 100;
+      return `<div class="dist-row dist-${side}" style="--w:${pct.toFixed(2)}%;"><span class="p">${formatPrice(o.p)}</span><span class="q">${formatQty(o.qty)}</span><span class="c">${o.count}</span></div>`;
+    };
+    priceDistEl.innerHTML = `
+      <div class="dist-wrap" style="display:flex;flex-wrap:wrap;gap:28px;">
+        <div style="flex:1;min-width:240px;">
+          <div class="muted" style="font-size:0.65rem;letter-spacing:0.08em;margin-bottom:4px;">BIDS</div>
+          <div class="dist-col">${bids.slice(0,25).map(o=>row('bid',o)).join('')||'<div class="muted">—</div>'}</div>
+        </div>
+        <div style="flex:1;min-width:240px;">
+          <div class="muted" style="font-size:0.65rem;letter-spacing:0.08em;margin-bottom:4px;">ASKS</div>
+          <div class="dist-col">${asks.slice(0,25).map(o=>row('ask',o)).join('')||'<div class="muted">—</div>'}</div>
+        </div>
+        <div style="flex:0 0 160px;">
+          <div class="muted" style="font-size:0.65rem;letter-spacing:0.08em;margin-bottom:4px;">MID</div>
+          <div style="font-size:0.9rem;font-weight:600;">${mid?formatPrice(mid):'—'}</div>
+        </div>
+      </div>`;
+  } catch {}
+}
+
 function renderOrdersList(book) {
   recentOrdersEl.innerHTML = '';
   const combined = [];
@@ -544,12 +576,15 @@ refreshBtn.addEventListener('click', () => {
 document.addEventListener('DOMContentLoaded', async () => {
   await initAccessControl();
   await load();
+  updateHistoryCharts();
+  updatePriceDistribution();
   if (!window.__auctionRefreshTimer) {
     window.__auctionRefreshTimer = setInterval(() => {
       if (document.hidden) return;
       if (isLoading) return;
       load();
       updateHistoryCharts();
+      updatePriceDistribution();
     }, 15000);
   }
   // kick initial charts

@@ -4,9 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Книга ордерів аукціону</title>
-  <!-- Consolidated styles: base modules and market module imported inside style.css -->
-  <link rel="stylesheet" href="css/backgroundstyle.css" />
-  <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/backgroundstyle.css" />
+    <link rel="stylesheet" href="css/style.css" />
   </head>
   <body class="market-theme">
     <header class="site-header market-header">
@@ -79,6 +78,14 @@
               </table>
             </div>
           </div>
+        </article>
+
+        <article class="card market-panel market-panel--wide">
+          <header class="market-panel__header">
+            <h3>Розподіл заявок</h3>
+          </header>
+          <div id="auction-history-charts" style="padding:8px 4px;"></div>
+          <div id="price-distribution" style="padding:8px 4px;"></div>
         </article>
 
         <aside class="card market-panel market-panel--secondary">

@@ -505,7 +505,21 @@ async function render() {
 			el('p', { className: 'section-heading__meta' }, 'Керуйте правами доступу, щоб зберегти швидкість роботи аукціонів.')
 		);
 		const toggle = el('button', { className: 'btn btn-ghost btn-compact', style: 'position:absolute;top:0;right:0;', onclick: () => { showBotUsers = !showBotUsers; render(); } }, showBotUsers ? 'Приховати ботів' : 'Показати ботів');
-		heading.appendChild(toggle);
+		const purge = el('button', { className: 'btn btn-danger btn-compact', style: 'position:absolute;top:0;right:130px;', onclick: async () => {
+			if (!confirm('Видалити ВСІХ ботів (bot_*) з усіма їхніми даними?')) return;
+			purge.disabled = true; purge.textContent = 'Видалення...';
+			try {
+				const { purgeAllBots } = await import('../api/auctions.js');
+				const res = await purgeAllBots({ usernamePrefix: 'bot_' });
+				showToast(`Видалено ботів: ${res.removedUsers || 0}`, 'success');
+				await render();
+			} catch (e) {
+				showToast(e?.message || 'Помилка видалення', 'error');
+			} finally {
+				purge.disabled = false; purge.textContent = 'Видалити ботів (всі)';
+			}
+		}}, 'Видалити ботів (всі)');
+		heading.append(toggle, purge);
 		return heading;
 	})());
 	const filteredUsers = showBotUsers ? users : users.filter(u => !(u.username || '').startsWith('bot_'));
