@@ -1,4 +1,4 @@
-import { getMyProfile, listAuctions, createAuction, clearAuction, closeAuction, listParticipantsAdmin, approveParticipant, listAuctionOrdersAdmin, listAuctionDocuments, listAdminUsers, promoteUser, demoteUser, authorizedFetch } from '../api.js';
+import { getMyProfile, listAuctions, createAuction, clearAuction, closeAuction, listParticipantsAdmin, approveParticipant, listAuctionOrdersAdmin, listAuctionDocuments, listAdminUsers, promoteUser, demoteUser, authorizedFetch, adminWalletSummary, adminWalletAction, adminWalletTransactions } from '../api.js';
 import { showToast } from '../ui/toast.js';
 import { initAccessControl } from '../ui/session.js';
 
@@ -13,6 +13,7 @@ function el(tag, props = {}, ...children) {
 }
 
 let currentUser = null;
+let walletSelectedUserId = null;
 
 function formatDateTime(value) {
 	if (!value) return '—';
@@ -27,6 +28,12 @@ function formatDateTime(value) {
 		console.warn('Failed to format datetime', error);
 		return String(value);
 	}
+}
+
+function formatNumber(value, { minimumFractionDigits = 0, maximumFractionDigits = 2 } = {}) {
+	const numeric = Number(value);
+	if (!Number.isFinite(numeric)) return '0';
+	return numeric.toLocaleString('uk-UA', { minimumFractionDigits, maximumFractionDigits });
 }
 
 function metricTile(label, value, meta) {
@@ -158,7 +165,9 @@ function auctionRow(a) {
 			const orders = await listAuctionOrdersAdmin(a.id);
 			const bids = orders.filter(o => o.side === 'bid').length;
 			const asks = orders.filter(o => o.side === 'ask').length;
-			ordersInfo.textContent = `Секретні заявки • ${orders.length} (bid ${bids} / ask ${asks})`;
+			const reservedTotal = orders.reduce((sum, order) => sum + (Number(order.reserved_amount) || 0), 0);
+			const clearedTotal = orders.reduce((sum, order) => sum + (Number(order.cleared_quantity) || 0), 0);
+			ordersInfo.textContent = `Секретні заявки • ${orders.length} (bid ${bids} / ask ${asks}) — зарезервовано ${formatNumber(reservedTotal, { maximumFractionDigits: 4 })}, кліринг ${formatNumber(clearedTotal, { maximumFractionDigits: 4 })}`;
 		} catch {
 			ordersInfo.textContent = 'Не вдалося завантажити заявки';
 		}
@@ -177,8 +186,9 @@ async function render() {
 
 	let users = [];
 	let auctions = [];
+	let walletOverview = { users: [], totals: { available: 0, reserved: 0, total: 0 } };
 	try {
-		[users, auctions] = await Promise.all([
+		[users, auctions, walletOverview] = await Promise.all([
 			listAdminUsers().catch((error) => {
 				console.error('Failed to load users', error);
 				return [];
@@ -186,6 +196,10 @@ async function render() {
 			listAuctions().catch((error) => {
 				console.error('Failed to load auctions', error);
 				return [];
+			}),
+			adminWalletSummary().catch((error) => {
+				console.error('Failed to load wallet overview', error);
+				return { users: [], totals: { available: 0, reserved: 0, total: 0 } };
 			}),
 		]);
 	} catch (error) {
@@ -224,6 +238,157 @@ async function render() {
 		})()
 	);
 	main.appendChild(overviewCard);
+
+	const walletCard = el('section', { className: 'dashboard-card dashboard-card--wallet' });
+	walletCard.append(
+		el('div', { className: 'section-heading' },
+			el('span', { className: 'eyebrow' }, 'Wallets'),
+			el('h2', { className: 'section-heading__title' }, 'Фінансовий облік користувачів'),
+			el('p', { className: 'section-heading__meta' }, 'Поповнюйте чи поверніть кошти клієнтам та слідкуйте за балансами в режимі реального часу.')
+		),
+		(() => {
+			const totals = walletOverview?.totals || { available: 0, reserved: 0, total: 0 };
+			const grid = el('div', { className: 'metrics-grid' });
+			grid.append(
+				metricTile('Доступно', totals.available?.toFixed ? totals.available.toFixed(2) : String(totals.available || 0)),
+				metricTile('Зарезервовано', totals.reserved?.toFixed ? totals.reserved.toFixed(2) : String(totals.reserved || 0)),
+				metricTile('Сумарно', totals.total?.toFixed ? totals.total.toFixed(2) : String(totals.total || 0))
+			);
+			return grid;
+		})()
+	);
+
+	const walletUsersList = el('div', { className: 'data-list wallet-users-list' });
+	const walletUsers = walletOverview?.users || [];
+	if (!walletUsers.length) {
+		walletUsersList.textContent = 'Гаманці ще не створено. Поповніть баланс через кабінет трейдера.';
+	} else {
+		walletUsers.forEach((row) => {
+			const available = Number(row.available ?? 0);
+			const reserved = Number(row.reserved ?? 0);
+			const total = available + reserved;
+			const item = el('div', { className: 'data-list__item' },
+				el('span', { className: 'data-list__label' }, `#${row.id} ${row.username || '—'}`),
+				el('span', { className: 'chip' }, `Avail • ${available.toFixed(2)}`),
+				el('span', { className: 'chip' }, `Res • ${reserved.toFixed(2)}`),
+				el('span', { className: 'data-list__meta' }, `Total ${total.toFixed(2)}`)
+			);
+			walletUsersList.appendChild(item);
+		});
+	}
+	walletCard.appendChild(walletUsersList);
+
+	const walletControls = el('div', { className: 'wallet-controls' });
+	const userSelect = el('select', { className: 'field wallet-controls__select' },
+		el('option', { value: '' }, 'Оберіть користувача')
+	);
+	walletUsers.forEach((row) => {
+		userSelect.appendChild(el('option', { value: String(row.id) }, `#${row.id} ${row.username}`));
+	});
+	if (walletUsers.length) {
+		const exists = walletUsers.some((row) => Number(row.id) === Number(walletSelectedUserId));
+		if (!exists) {
+			walletSelectedUserId = walletUsers[0].id;
+		}
+		if (walletSelectedUserId) {
+			userSelect.value = String(walletSelectedUserId);
+		}
+	}
+
+	const selectRow = el('div', { className: 'wallet-controls__row' },
+		el('label', { className: 'form-field', style: 'flex:1;' },
+			el('span', { className: 'form-field__label' }, 'Користувач'),
+			userSelect
+		)
+	);
+	walletControls.appendChild(selectRow);
+
+	const actionForm = el('form', { className: 'inline-form wallet-action-form' },
+		el('select', { className: 'field', name: 'action' },
+			el('option', { value: 'deposit' }, 'Поповнити'),
+			el('option', { value: 'withdraw' }, 'Списати'),
+			el('option', { value: 'reserve' }, 'Зарезервувати'),
+			el('option', { value: 'release' }, 'Розморозити'),
+			el('option', { value: 'spend' }, 'Списати резерв')
+		),
+		el('input', { className: 'field', name: 'amount', type: 'number', min: '0', step: '0.01', placeholder: 'Сума', required: true }),
+		el('input', { className: 'field', name: 'note', placeholder: 'Нотатка (опційно)' }),
+		el('button', { className: 'btn btn-primary btn-compact', type: 'submit' }, 'Застосувати')
+	);
+	walletControls.appendChild(actionForm);
+	walletCard.appendChild(walletControls);
+
+	const txList = el('div', { className: 'data-list wallet-transactions' });
+	walletCard.appendChild(txList);
+	main.appendChild(walletCard);
+
+	async function refreshTransactions(userId) {
+		if (!userId) {
+			txList.textContent = 'Оберіть користувача, щоб побачити історію транзакцій.';
+			return;
+		}
+		txList.textContent = 'Завантаження транзакцій…';
+		try {
+			const transactions = await adminWalletTransactions(userId, 50);
+			if (!transactions.length) {
+				txList.textContent = 'Поки що немає історії.';
+				return;
+			}
+			txList.innerHTML = '';
+			transactions.forEach((tx) => {
+				const metaSpan = tx.meta ? el('span', { className: 'chip' }, JSON.stringify(tx.meta)) : null;
+				const amountValue = Number(tx.amount ?? 0);
+				const row = el('div', { className: 'data-list__item' },
+					el('span', { className: 'data-list__label' }, `#${tx.id} ${tx.type}`),
+					el('span', { className: 'chip' }, amountValue.toFixed(2)),
+					el('span', { className: 'data-list__meta' }, tx.createdAt ? formatDateTime(tx.createdAt) : '—'),
+					metaSpan
+				);
+				txList.appendChild(row);
+			});
+		} catch (error) {
+			console.error('Failed to load wallet transactions', error);
+			txList.textContent = 'Не вдалося завантажити транзакції.';
+		}
+	}
+
+	if (walletSelectedUserId) {
+		refreshTransactions(Number(walletSelectedUserId)).catch(() => {});
+	} else {
+		txList.textContent = 'Оберіть користувача, щоб побачити історію транзакцій.';
+	}
+
+	userSelect.addEventListener('change', () => {
+		walletSelectedUserId = userSelect.value ? Number(userSelect.value) : null;
+		refreshTransactions(walletSelectedUserId).catch(() => {});
+	});
+
+	actionForm.addEventListener('submit', async (event) => {
+		event.preventDefault();
+		const targetId = userSelect.value ? Number(userSelect.value) : null;
+		if (!targetId) {
+			showToast('Оберіть користувача для операції', 'error');
+			return;
+		}
+		const fd = new FormData(actionForm);
+		const action = String(fd.get('action') || 'deposit');
+		const amountRaw = String(fd.get('amount') || '').trim();
+		const note = String(fd.get('note') || '').trim() || undefined;
+		const numericAmount = Number(amountRaw);
+		if (!(numericAmount > 0)) {
+			showToast('Вкажіть додатну суму', 'error');
+			return;
+		}
+		try {
+			await adminWalletAction(targetId, { action, amount: amountRaw, note });
+			showToast('Операцію виконано', 'success');
+			walletSelectedUserId = targetId;
+			await render();
+			return;
+		} catch (error) {
+			showToast(error?.message || 'Не вдалося виконати операцію', 'error');
+		}
+	});
 
 	const quickActionsCard = el('section', { className: 'dashboard-card dashboard-card--actions' });
 	quickActionsCard.append(

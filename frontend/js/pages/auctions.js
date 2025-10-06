@@ -213,13 +213,38 @@ function createHistoryCard(auction) {
       el('span', {}, `Завершено • ${formatDate(auction.window_end || auction.updated_at || auction.created_at)}`)
     )
   );
-  if (auction.clearing_price || auction.clearing_quantity) {
-    card.append(
-      el('div', { className: 'auction-card__summary' },
-        el('span', {}, `Clearing price • ${formatPrice(auction.clearing_price)}`),
-        el('span', {}, `Matched qty • ${formatNumber(auction.clearing_quantity)}`)
-      )
-    );
+  const hasClearingMetrics = [
+    auction.clearing_price,
+    auction.clearing_quantity,
+    auction.clearing_price_low,
+    auction.clearing_price_high,
+    auction.clearing_demand,
+    auction.clearing_supply
+  ].some((value) => value !== undefined && value !== null);
+  if (hasClearingMetrics) {
+    const summaryBits = [];
+    if (auction.clearing_price !== undefined && auction.clearing_price !== null) {
+      summaryBits.push(el('span', {}, `Clearing price • ${formatPrice(auction.clearing_price)}`));
+    }
+    if (auction.clearing_quantity !== undefined && auction.clearing_quantity !== null) {
+      summaryBits.push(el('span', {}, `Matched qty • ${formatNumber(auction.clearing_quantity)}`));
+    }
+    if (auction.clearing_price_low !== undefined && auction.clearing_price_low !== null && auction.clearing_price_high !== undefined && auction.clearing_price_high !== null) {
+      summaryBits.push(el('span', {}, `Price range • ${formatPrice(auction.clearing_price_low)} – ${formatPrice(auction.clearing_price_high)}`));
+    }
+    if (auction.clearing_demand !== undefined && auction.clearing_demand !== null) {
+      summaryBits.push(el('span', {}, `Demand • ${formatNumber(auction.clearing_demand)}`));
+    }
+    if (auction.clearing_supply !== undefined && auction.clearing_supply !== null) {
+      summaryBits.push(el('span', {}, `Supply • ${formatNumber(auction.clearing_supply)}`));
+    }
+    if (summaryBits.length) {
+      card.append(
+        el('div', { className: 'auction-card__summary' },
+          ...summaryBits
+        )
+      );
+    }
   }
   card.append(
     el('div', { className: 'auction-card__actions' },

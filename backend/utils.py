@@ -1,13 +1,13 @@
 import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List
-from .errors import AppFail
+from .errors import AppError
 
-def to_plain(data: Any) -> Any:
+def serialize(data: Any) -> Any:
     if isinstance(data, list):
-        return [to_plain(item) for item in data]
+        return [serialize(item) for item in data]
     if isinstance(data, dict):
-        return {key: to_plain(value) for key, value in data.items()}
+        return {key: serialize(value) for key, value in data.items()}
     if isinstance(data, Decimal):
         try:
             return float(data)
@@ -20,18 +20,18 @@ def to_plain(data: Any) -> Any:
             return str(data)
     return data
 
-def to_dec(value: Any) -> Decimal:
+def to_decimal(value: Any) -> Decimal:
     try:
         if isinstance(value, Decimal):
             return value
         return Decimal(str(value))
     except (InvalidOperation, TypeError, ValueError):
-        raise AppFail("Invalid numeric value", statuscode=400)
+        raise AppError("Invalid numeric value", statuscode=400)
 
-def utc_now() -> datetime.datetime:
+def now_utc() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc)
 
-def trim_or_none(value: Any) -> str | None:
+def clean_string(value: Any) -> str | None:
     if value is None:
         return None
     if isinstance(value, str):
@@ -39,17 +39,17 @@ def trim_or_none(value: Any) -> str | None:
         return value or None
     return str(value).strip() or None
 
-def is_admin_user(user: Dict[str, Any] | None) -> bool:
+def is_admin(user: Dict[str, Any] | None) -> bool:
     return bool(user) and int(user.get('is_admin', 0)) == 1
 
-def is_trader_user(user: Dict[str, Any] | None) -> bool:
-    return bool(user) and not is_admin_user(user)
+def is_trader(user: Dict[str, Any] | None) -> bool:
+    return bool(user) and not is_admin(user)
 
 __all__ = [
-    'to_plain',
-    'to_dec',
-    'utc_now',
-    'trim_or_none',
-    'is_admin_user',
-    'is_trader_user',
+    'serialize',
+    'to_decimal',
+    'now_utc',
+    'clean_string',
+    'is_admin',
+    'is_trader',
 ]

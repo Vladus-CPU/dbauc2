@@ -444,6 +444,34 @@ export async function listAdminUsers() {
     return res.json();
 }
 
+export async function adminWalletSummary() {
+    const res = await authorizedFetch('/api/admin/wallet');
+    if (!res.ok) throw new Error(`Admin wallet overview failed: ${res.status}`);
+    return res.json();
+}
+
+export async function adminWalletAction(userId, { action, amount, note }) {
+    const res = await authorizedFetch(`/api/admin/wallet/${userId}/actions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, amount, note }),
+    });
+    if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`Admin wallet action failed: ${res.status} ${txt}`);
+    }
+    return res.json();
+}
+
+export async function adminWalletTransactions(userId, limit = 100) {
+    const params = new URLSearchParams();
+    if (limit) params.set('limit', String(limit));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const res = await authorizedFetch(`/api/admin/wallet/${userId}/transactions${suffix}`);
+    if (!res.ok) throw new Error(`Admin wallet transactions failed: ${res.status}`);
+    return res.json();
+}
+
 export async function listAuctionDocuments(auctionId) {
     const res = await authorizedFetch(`/api/admin/auctions/${auctionId}/documents`);
     if (!res.ok) throw new Error(`List documents failed: ${res.status}`);
