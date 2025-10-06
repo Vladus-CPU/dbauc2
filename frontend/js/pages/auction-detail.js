@@ -122,22 +122,29 @@ function renderSummary(book) {
 function renderBook(book) {
   bidsBody.innerHTML = '';
   asksBody.innerHTML = '';
-  (book.book.bids || []).slice(0, 15).forEach((level) => {
+  const bidLevels = (book.book.bids || []).slice(0, 15);
+  const askLevels = (book.book.asks || []).slice(0, 15);
+  // Find max cumulative for visual scaling (use side-specific cumulative)
+  const maxBidCum = Math.max(...bidLevels.map(l => l.cumulativeQuantity || 0), 0);
+  const maxAskCum = Math.max(...askLevels.map(l => l.cumulativeQuantity || 0), 0);
+  bidLevels.forEach((level) => {
     const tr = document.createElement('tr');
     tr.className = 'bid-row';
+    const depthPct = maxBidCum ? (level.cumulativeQuantity / maxBidCum) * 100 : 0;
     tr.innerHTML = `
-      <td>${formatPrice(level.price)}</td>
+      <td class="depth-cell"><div class="depth-bar depth-bar--bid" style="--d:${depthPct.toFixed(2)}%"></div><span>${formatPrice(level.price)}</span></td>
       <td>${formatQty(level.totalQuantity)}</td>
       <td>${level.orderCount}</td>
       <td>${formatQty(level.cumulativeQuantity)}</td>
     `;
     bidsBody.append(tr);
   });
-  (book.book.asks || []).slice(0, 15).forEach((level) => {
+  askLevels.forEach((level) => {
     const tr = document.createElement('tr');
     tr.className = 'ask-row';
+    const depthPct = maxAskCum ? (level.cumulativeQuantity / maxAskCum) * 100 : 0;
     tr.innerHTML = `
-      <td>${formatPrice(level.price)}</td>
+      <td class="depth-cell"><div class="depth-bar depth-bar--ask" style="--d:${depthPct.toFixed(2)}%"></div><span>${formatPrice(level.price)}</span></td>
       <td>${formatQty(level.totalQuantity)}</td>
       <td>${level.orderCount}</td>
       <td>${formatQty(level.cumulativeQuantity)}</td>
@@ -166,15 +173,18 @@ function renderMetrics(book) {
     ['Глибина на найкращому ask', m.bestAskDepth],
     ['Ордерів @ найк. bid', m.bestBidOrders],
     ['Ордерів @ найк. ask', m.bestAskOrders],
+    ['Top3 глибина bid', m.top3BidDepth],
+    ['Top3 глибина ask', m.top3AskDepth],
+    ['Top3 ордерів bid', m.top3BidOrders],
+    ['Top3 ордерів ask', m.top3AskOrders],
     ['Дисбаланс глибини', typeof m.depthImbalance === 'number' ? (m.depthImbalance * 100) : m.depthImbalance],
     ['Остання ціна клірингу', m.lastClearingPrice],
     ['Останній обсяг клірингу', m.lastClearingQuantity],
   ];
-  const formatValue = (value) => {
+  const formatValue = (label, value) => {
     if (value === null || value === undefined) return '—';
-    if (typeof value === 'number') return formatNumber(value);
-    // Show % sign for imbalance if already converted to number percent
     if (label.includes('Дисбаланс') && typeof value === 'number') return `${formatNumber(value, { maximumFractionDigits: 2 })}%`;
+    if (typeof value === 'number') return formatNumber(value);
     if (typeof value === 'string' && value.trim() === '') return '—';
     return value;
   };
@@ -182,7 +192,7 @@ function renderMetrics(book) {
     const dt = document.createElement('dt');
     dt.textContent = label;
     const dd = document.createElement('dd');
-    dd.textContent = formatValue(value);
+    dd.textContent = formatValue(label, value);
     metricsEl.append(dt, dd);
   });
 }

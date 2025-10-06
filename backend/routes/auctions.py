@@ -187,7 +187,6 @@ def auction_order_book(auction_id: int):
         spread = None
         if best_bid_dec is not None and best_ask_dec is not None:
             spread = float((best_ask_dec - best_bid_dec).quantize(DECIMAL_QUANT))
-        # Mid price (average of best bid / ask) and depth metrics
         mid_price = None
         if best_bid_dec is not None and best_ask_dec is not None:
             try:
@@ -201,6 +200,12 @@ def auction_order_book(auction_id: int):
         depth_imbalance = None
         if isinstance(best_bid_depth, float) and isinstance(best_ask_depth, float) and (best_bid_depth + best_ask_depth) > 0:
             depth_imbalance = (best_bid_depth - best_ask_depth) / (best_bid_depth + best_ask_depth)
+        # Cumulative depth (top 3 levels) for additional liquidity context
+        top_n = 3
+        cum_bid_depth = sum((lvl['totalQuantity'] for lvl in bid_levels[:top_n]), 0.0) if bid_levels else None
+        cum_ask_depth = sum((lvl['totalQuantity'] for lvl in ask_levels[:top_n]), 0.0) if ask_levels else None
+        cum_bid_orders = sum((lvl['orderCount'] for lvl in bid_levels[:top_n]), 0) if bid_levels else None
+        cum_ask_orders = sum((lvl['orderCount'] for lvl in ask_levels[:top_n]), 0) if ask_levels else None
 
         cur.execute(
             "SELECT id, trader_id, side, price, quantity, created_at, cleared_price, cleared_quantity "
@@ -233,6 +238,10 @@ def auction_order_book(auction_id: int):
             "bestBidOrders": best_bid_orders_level,
             "bestAskOrders": best_ask_orders_level,
             "depthImbalance": depth_imbalance,
+            "top3BidDepth": cum_bid_depth,
+            "top3AskDepth": cum_ask_depth,
+            "top3BidOrders": cum_bid_orders,
+            "top3AskOrders": cum_ask_orders,
             "lastClearingPrice": cleared_entries[0]['price'] if cleared_entries else None,
             "lastClearingQuantity": cleared_entries[0]['quantity'] if cleared_entries else None,
         }
