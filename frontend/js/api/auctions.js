@@ -61,3 +61,16 @@ export async function seedRandomAuctionOrders(auctionId, options = {}) {
     }
     return res.json();
 }
+
+export async function cleanupAuctionBots(auctionId, options = {}) {
+    const res = await authorizedFetch(`/api/admin/auctions/${auctionId}/cleanup_bots`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(options)
+    });
+    if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`Не вдалося очистити ботів: ${res.status} ${txt}`);
+    }
+    return res.json();
+}

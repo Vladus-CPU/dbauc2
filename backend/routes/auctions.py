@@ -953,3 +953,106 @@ def seed_random_orders(auction_id: int):
         except Exception:
             pass
         conn.close()
+
+@auctions_bp.post('/admin/auctions/<int:auction_id>/cleanup_bots')
+@require_admin
+def cleanup_bots(auction_id: int):
+    """Remove bot-generated orders & participants for a specific auction.
+
+    Body JSON parameters:
+      usernamePrefix: string (default 'bot_') – pattern prefix for LIKE '<prefix>%'
+      removeUsers: bool (default false) – if true, delete user accounts that no longer
+                  participate in any other auctions after cleanup.
+    Returns JSON summary with counts.
+    """
+    data = request.get_json(silent=True) or {}
+    prefix = (data.get('usernamePrefix') or 'bot_').strip() or 'bot_'
+    remove_users = bool(data.get('removeUsers'))
+    like_pattern = prefix + '%'
+    conn = db_connection()
+    cur = conn.cursor(dictionary=True)
+    try:
+        ensure_users_table(conn)
+        ensure_auctions_tables(conn)
+        # Verify auction exists
+        cur.execute("SELECT id FROM auctions WHERE id=%s", (auction_id,))
+        if not cur.fetchone():
+            raise AppError("Auction not found", statuscode=404)
+
+        # Collect bot user ids related to this auction
+        cur.execute(
+            """
+            SELECT DISTINCT u.id FROM users u
+            JOIN auction_orders ao ON ao.trader_id=u.id
+            WHERE ao.auction_id=%s AND u.username LIKE %s
+            UNION
+            SELECT DISTINCT u.id FROM users u
+            JOIN auction_participants ap ON ap.trader_id=u.id
+            WHERE ap.auction_id=%s AND u.username LIKE %s
+            """,
+            (auction_id, like_pattern, auction_id, like_pattern)
+        )
+        bot_ids_rows = cur.fetchall()
+        bot_ids = [row['id'] for row in bot_ids_rows]
+        if not bot_ids:
+            return jsonify({"message": "No bot users for this auction", "auctionId": auction_id, "removedOrders": 0, "removedParticipants": 0, "removedUsers": 0})
+
+        # Delete orders for those users in this auction
+        cur.close(); cur = conn.cursor()
+        cur.execute(
+            f"DELETE FROM auction_orders WHERE auction_id=%s AND trader_id IN ({','.join(['%s']*len(bot_ids))})",
+            (auction_id, *bot_ids)
+        )
+        removed_orders = cur.rowcount
+        # Delete participants
+        cur.execute(
+            f"DELETE FROM auction_participants WHERE auction_id=%s AND trader_id IN ({','.join(['%s']*len(bot_ids))})",
+            (auction_id, *bot_ids)
+        )
+        removed_participants = cur.rowcount
+
+        removed_users = 0
+        if remove_users:
+            # Find which of these users have any remaining auction presence
+            cur.execute(
+                f"""
+                SELECT u.id, (
+                  SELECT COUNT(*) FROM auction_orders ao WHERE ao.trader_id=u.id
+                ) + (
+                  SELECT COUNT(*) FROM auction_participants ap WHERE ap.trader_id=u.id
+                ) AS refcount
+                FROM users u WHERE u.id IN ({','.join(['%s']*len(bot_ids))})
+                """,
+                tuple(bot_ids)
+            )
+            still_rows = cur.fetchall()
+            deletable = [r['id'] for r in still_rows if int(r.get('refcount') or 0) == 0]
+            if deletable:
+                cur.execute(
+                    f"DELETE FROM users WHERE id IN ({','.join(['%s']*len(deletable))})",
+                    tuple(deletable)
+                )
+                removed_users = cur.rowcount
+
+        conn.commit()
+        return jsonify({
+            "message": "Cleanup completed",
+            "auctionId": auction_id,
+            "botUserIds": bot_ids,
+            "removedOrders": removed_orders,
+            "removedParticipants": removed_participants,
+            "removedUsers": removed_users,
+            "usernamePrefix": prefix
+        })
+    except AppError:
+        try: conn.rollback()
+        except Exception: pass
+        raise
+    except Exception as e:
+        try: conn.rollback()
+        except Exception: pass
+        raise DBError("Error cleaning up bot data", details=str(e))
+    finally:
+        try: cur.close()
+        except Exception: pass
+        conn.close()
