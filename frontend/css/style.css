@@ -14,7 +14,7 @@
 @import url("./modules/forms.css");
 @import url("./modules/inventory.css");
 @import url("./modules/market.css");
-@import url("./modules/listing-card.css");
+
 .metrics-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
