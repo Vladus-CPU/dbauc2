@@ -14,6 +14,7 @@ function el(tag, props = {}, ...children) {
 
 let currentUser = null;
 let walletSelectedUserId = null;
+let showBotUsers = false;
 
 function formatDateTime(value) {
 	if (!value) return '—';
@@ -497,18 +498,22 @@ async function render() {
 	main.appendChild(formCard);
 
 	const usersSec = el('section', { className: 'dashboard-card dashboard-card--team' });
-	usersSec.append(
-		el('div', { className: 'section-heading' },
+	usersSec.append((() => {
+		const heading = el('div', { className: 'section-heading', style: 'position:relative;' },
 			el('span', { className: 'eyebrow' }, 'Команда'),
 			el('h2', { className: 'section-heading__title' }, 'Адміністратори та трейдери'),
 			el('p', { className: 'section-heading__meta' }, 'Керуйте правами доступу, щоб зберегти швидкість роботи аукціонів.')
-		)
-	);
+		);
+		const toggle = el('button', { className: 'btn btn-ghost btn-compact', style: 'position:absolute;top:0;right:0;', onclick: () => { showBotUsers = !showBotUsers; render(); } }, showBotUsers ? 'Приховати ботів' : 'Показати ботів');
+		heading.appendChild(toggle);
+		return heading;
+	})());
+	const filteredUsers = showBotUsers ? users : users.filter(u => !(u.username || '').startsWith('bot_'));
 	const usersList = el('div', { className: 'data-list team-list' });
-	if (!users.length) {
-		usersList.textContent = 'Користувачів не знайдено';
+	if (!filteredUsers.length) {
+		usersList.textContent = showBotUsers ? 'Користувачів не знайдено' : 'Немає користувачів (боти приховані)';
 	} else {
-		users.forEach((u) => {
+		filteredUsers.forEach((u) => {
 			const isSelf = currentUser && Number(currentUser.id) === Number(u.id);
 			const item = el('div', { className: 'data-list__item team-list__item' },
 				el('div', { className: 'team-list__info' },
