@@ -1,4 +1,4 @@
-import { getMyProfile, listAuctions, createAuction, clearAuction, closeAuction, listParticipantsAdmin, approveParticipant, listAuctionOrdersAdmin, listAuctionDocuments, listAdminUsers, promoteUser, demoteUser, authorizedFetch, adminWalletSummary, adminWalletAction, adminWalletTransactions, seedRandomAuctionOrders } from '../api.js';
+import { getMyProfile, listAuctions, createAuction, clearAuction, closeAuction, listParticipantsAdmin, approveParticipant, listAuctionOrdersAdmin, listAuctionDocuments, listAdminUsers, promoteUser, demoteUser, authorizedFetch, adminWalletSummary, adminWalletAction, adminWalletTransactions, seedRandomAuctionOrders, cleanupAuctionBots } from '../api.js';
 import { showToast } from '../ui/toast.js';
 import { initAccessControl } from '../ui/session.js';
 
@@ -611,8 +611,23 @@ async function render() {
 						</label>
 						<button type="submit" class="btn btn-primary btn-compact" style="margin-left:4px;">Згенерувати</button>
 						<button type="button" data-role="refresh-orders" class="btn btn-ghost btn-compact" title="Оновити дані">↻</button>
+						<button type="button" data-role="cleanup-bots" class="btn btn-ghost btn-compact" title="Очистити ботів">🗑</button>
 						<span class="seed-status muted" style="font-size:0.7rem;margin-left:auto;"></span>
 					</fieldset>`;
+				seedForm.querySelector('[data-role="cleanup-bots"]').addEventListener('click', async () => {
+					if (!confirm('Видалити бот-ордери та учасників цього аукціону?')) return;
+					statusEl.textContent = 'Очистка...';
+					try {
+						await cleanupAuctionBots(a.id, { removeUsers: false });
+						statusEl.textContent = 'Очищено';
+						showToast('Ботів очищено', 'success');
+						setTimeout(()=>{ statusEl.textContent=''; }, 2500);
+						await render();
+					} catch (e) {
+						statusEl.textContent = 'Помилка';
+						showToast(e?.message || 'Не вдалося очистити', 'error');
+					}
+				});
 				const statusEl = seedForm.querySelector('.seed-status');
 				seedForm.addEventListener('submit', async (ev) => {
 					ev.preventDefault();
