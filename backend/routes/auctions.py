@@ -654,7 +654,7 @@ def clear_auction(auction_id: int):
     cur = conn.cursor(dictionary=True)
     try:
         ensure_auctions_tables(conn)
-        cur.execute("SELECT id, k_value, status FROM auctions WHERE id=%s", (auction_id,))
+        cur.execute("SELECT id, k_value, status, admin_id FROM auctions WHERE id=%s", (auction_id,))
         auction = cur.fetchone()
         if not auction:
             raise AppError("Auction not found", statuscode=404)
