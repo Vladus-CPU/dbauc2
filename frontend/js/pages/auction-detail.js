@@ -35,7 +35,9 @@ function formatNumber(value, options = {}) {
   return Number(value).toLocaleString('uk-UA', { ...defaults, ...options });
 }
 
-function formatPrice(value) { return formatNumber(value, { maximumFractionDigits: 1 }); }
+// Prices: show 2 decimals to keep tick visibility; allow more if needed later
+function formatPrice(value) { return formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+// Quantity: 0–1 decimals (auto, use original rounding)
 function formatQty(value) { return formatNumber(value, { maximumFractionDigits: 1 }); }
 
 function formatDate(value) {
@@ -121,15 +123,18 @@ function renderBook(book) {
   // Use backend-provided aggregated levels (already grouped per exact price)
   const bidLevels = (book.book.bids || []).slice(0, 15); // sorted desc by backend
   const askLevels = (book.book.asks || []).slice(0, 15); // sorted asc by backend
+  const totalVolume = (book.metrics?.totalBidQuantity || 0) + (book.metrics?.totalAskQuantity || 0);
   const maxBidCum = Math.max(...bidLevels.map(l => l.cumulativeQuantity || 0), 0);
   const maxAskCum = Math.max(...askLevels.map(l => l.cumulativeQuantity || 0), 0);
   bidLevels.forEach((level) => {
     const tr = document.createElement('tr');
     tr.className = 'bid-row';
     const depthPct = maxBidCum ? (level.cumulativeQuantity / maxBidCum) * 100 : 0;
+    const sharePct = totalVolume ? (level.totalQuantity / totalVolume) * 100 : 0;
     tr.innerHTML = `
       <td class="depth-cell"><div class="depth-bar depth-bar--bid" style="--d:${depthPct.toFixed(2)}%"></div><span>${formatPrice(level.price)}</span></td>
       <td class="num">${formatQty(level.totalQuantity)}</td>
+      <td class="num lvl-share" title="Частка від загального обсягу">${sharePct?formatNumber(sharePct,{maximumFractionDigits:1})+'%':'—'}</td>
       <td class="num">${level.orderCount}</td>
       <td class="num">${formatQty(level.cumulativeQuantity)}</td>
     `;
@@ -139,9 +144,11 @@ function renderBook(book) {
     const tr = document.createElement('tr');
     tr.className = 'ask-row';
     const depthPct = maxAskCum ? (level.cumulativeQuantity / maxAskCum) * 100 : 0;
+    const sharePct = totalVolume ? (level.totalQuantity / totalVolume) * 100 : 0;
     tr.innerHTML = `
       <td class="depth-cell"><div class="depth-bar depth-bar--ask" style="--d:${depthPct.toFixed(2)}%"></div><span>${formatPrice(level.price)}</span></td>
       <td class="num">${formatQty(level.totalQuantity)}</td>
+      <td class="num lvl-share" title="Частка від загального обсягу">${sharePct?formatNumber(sharePct,{maximumFractionDigits:1})+'%':'—'}</td>
       <td class="num">${level.orderCount}</td>
       <td class="num">${formatQty(level.cumulativeQuantity)}</td>
     `;
