@@ -59,6 +59,25 @@
             <input type="checkbox" id="auction-auto-refresh" checked />
             <span>Автооновлення</span>
           </label>
+          <label class="auction-filters__field">
+            <span>Сортування</span>
+            <select id="auction-filter-sort" name="sort">
+              <option value="start_asc">Старт ↑</option>
+              <option value="start_desc">Старт ↓</option>
+              <option value="end_asc">Завершення ↑</option>
+              <option value="end_desc">Завершення ↓</option>
+              <option value="created_desc">Створено ↓</option>
+              <option value="created_asc">Створено ↑</option>
+              <option value="k_desc">k ↓</option>
+              <option value="k_asc">k ↑</option>
+              <option value="product_asc">Назва A→Z</option>
+              <option value="product_desc">Назва Z→A</option>
+            </select>
+          </label>
+          <label class="auction-filters__field auction-filters__switch" title="Більш щільне відображення карток">
+            <input type="checkbox" id="auction-compact-toggle" />
+            <span>Щільно</span>
+          </label>
           <div class="auction-filters__actions">
             <button type="button" class="btn btn-ghost btn-compact" id="auction-refresh-btn">Оновити</button>
           </div>
