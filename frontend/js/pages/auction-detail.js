@@ -1,7 +1,6 @@
 import {getAuctionBook, getMe, joinAuction, myParticipationStatus, placeAuctionOrder,} from '../api.js';
 import { showToast } from '../ui/toast.js';
 import { initAccessControl } from '../ui/session.js';
-import { tStatus, tSide, localizeErrorMessage } from '../ui/i18n.js';
 
 const params = new URLSearchParams(window.location.search);
 const auctionId = Number(params.get('id'));
@@ -51,6 +50,33 @@ function formatDate(value) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(date);
+}
+
+// Локальні утиліти (без окремого i18n модуля)
+function tStatus(value) {
+  const map = {
+    collecting: 'Збір заявок',
+    cleared: 'Відклірингено',
+    closed: 'Закрито',
+  };
+  if (!value) return '—';
+  return map[value] || value;
+}
+
+function tSide(value) {
+  const map = { bid: 'купівля', ask: 'продаж' };
+  if (!value) return '—';
+  return map[value] || value;
+}
+
+function localizeErrorMessage(msg) {
+  if (!msg) return 'Сталася невідома помилка';
+  const lower = msg.toLowerCase();
+  if (lower.includes('unauthorized') || lower.includes('forbidden')) return 'Немає прав доступу';
+  if (lower.includes('not found')) return 'Не знайдено';
+  if (lower.includes('invalid') || lower.includes('must')) return 'Неправильні дані запиту';
+  if (lower.includes('timeout')) return 'Перевищено час очікування';
+  return msg;
 }
 
 function renderSummary(book) {
