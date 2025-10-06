@@ -30,20 +30,13 @@ if (!auctionId) {
 let isLoading = false;
 
 function formatNumber(value, options = {}) {
-  if (value === null || value === undefined || Number.isNaN(Number(value))) {
-    return '—';
-  }
-  const defaults = { minimumFractionDigits: 0, maximumFractionDigits: 6 };
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
+  const defaults = { minimumFractionDigits: 0, maximumFractionDigits: 1 };
   return Number(value).toLocaleString('uk-UA', { ...defaults, ...options });
 }
 
-function formatPrice(value) {
-  return formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
-}
-
-function formatQty(value) {
-  return formatNumber(value, { maximumFractionDigits: 6 });
-}
+function formatPrice(value) { return formatNumber(value, { maximumFractionDigits: 1 }); }
+function formatQty(value) { return formatNumber(value, { maximumFractionDigits: 1 }); }
 
 function formatDate(value) {
   if (!value) return '—';
@@ -90,7 +83,7 @@ function renderSummary(book) {
 
   const meta = [];
   meta.push(`<span><strong>Тип:</strong> ${auction.type}</span>`);
-  meta.push(`<span><strong>k:</strong> ${formatNumber(auction.k_value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`);
+  meta.push(`<span><strong>k:</strong> ${formatNumber(auction.k_value, { maximumFractionDigits: 1 })}</span>`);
   if (auction.window_start) {
     meta.push(`<span><strong>Початок:</strong> ${formatDate(auction.window_start)}</span>`);
   }
@@ -179,7 +172,7 @@ function renderMetrics(book) {
   };
   const fmt = (val, {pct=false}={}) => {
     if (val===null || val===undefined || Number.isNaN(val)) return '—';
-    if (pct) return `${formatNumber(val,{maximumFractionDigits:2})}%`;
+  if (pct) return `${formatNumber(val,{maximumFractionDigits:1})}%`;
     if (typeof val==='number') return formatNumber(val);
     return val;
   };

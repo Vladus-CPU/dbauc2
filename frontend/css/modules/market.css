@@ -98,9 +98,9 @@
 }
 
 /* New responsive layout with tabs */
-.market-layout { display:flex; align-items:flex-start; gap:24px; }
+.market-layout { display:flex; align-items:flex-start; gap:24px; max-width:1500px; margin:0 auto; padding:0 12px; }
 .market-main { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:14px; }
-.market-side { flex:0 0 300px; position:relative; }
+.market-side { flex:0 0 320px; position:relative; }
 .market-sticky { position:sticky; top:12px; }
 
 .market-tabs__nav { display:flex; gap:6px; flex-wrap:wrap; }
@@ -119,9 +119,11 @@
 
 .chart-block { margin-bottom:18px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.05); padding:12px 10px; border-radius:10px; }
 
+@media (max-width: 1400px){ .market-layout { max-width:1140px; } }
+@media (max-width: 1220px){ .market-layout { max-width:1000px; } }
 @media (max-width: 1100px) {
-    .market-layout { flex-direction:column; }
-    .market-side { width:100%; }
+    .market-layout { flex-direction:column; max-width:100%; }
+    .market-side { width:100%; flex:0 0 auto; }
     .market-sticky { position:static; }
     .table-scroll { max-height:300px; }
 }
