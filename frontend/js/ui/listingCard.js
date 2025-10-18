@@ -22,7 +22,6 @@ export function createListingCard(item) {
     const title = document.createElement('h3');
     title.textContent = titleText;
     card.appendChild(title);
-
     const metadata = document.createElement('div');
     metadata.className = 'listing-card__meta';
     const bits = [];

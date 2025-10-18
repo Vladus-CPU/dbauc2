@@ -37,6 +37,11 @@ def _log_tx(conn, user_id: int, tx_type: str, amount: Decimal, available: Decima
     finally:
         cur.close()
 
+def wallet_balance(conn, user_id: int):
+    _ensure_wallet_row(conn, user_id)
+    available, reserved = _get_balances(conn, user_id)
+    return {'available': available, 'reserved': reserved, 'total': available + reserved}
+
 def wallet_deposit(conn, user_id: int, amount: Decimal, meta: Optional[dict] = None):
     if amount <= 0:
         raise OrderDataError("Deposit amount must be positive")
@@ -127,16 +132,4 @@ def wallet_spend(conn, user_id: int, amount: Decimal, meta: Optional[dict] = Non
     tx_id = _log_tx(conn, user_id, 'spend', -amount, available, meta)
     return {'available': available, 'reserved': reserved, 'txId': tx_id}
 
-def wallet_balance(conn, user_id: int):
-    _ensure_wallet_row(conn, user_id)
-    available, reserved = _get_balances(conn, user_id)
-    return {'available': available, 'reserved': reserved, 'total': available + reserved}
-
-__all__ = [
-    'wallet_deposit',
-    'wallet_withdraw',
-    'wallet_reserve',
-    'wallet_release',
-    'wallet_spend',
-    'wallet_balance',
-]
+__all__ = ['wallet_deposit', 'wallet_withdraw', 'wallet_reserve', 'wallet_release', 'wallet_spend', 'wallet_balance']

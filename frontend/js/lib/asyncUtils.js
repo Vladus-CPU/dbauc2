@@ -1,6 +1,3 @@
-// Shared async & UI helpers
-// Provides: debounce, createLocker, withButtonLoading, format helpers
-
 export function debounce(fn, wait = 300) {
   let t = null;
   return function(...args) {
@@ -9,7 +6,6 @@ export function debounce(fn, wait = 300) {
   };
 }
 
-// Simple keyed locker to prevent overlapping logical actions
 export function createLocker() {
   const locks = new Set();
   return function withLock(key, fn) {

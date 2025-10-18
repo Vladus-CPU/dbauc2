@@ -47,42 +47,6 @@ def get_balance():
         conn.close()
 
 
-@wallet_bp.post('/deposit')
-def deposit():
-    user = current_user()
-    data = request.get_json(silent=True) or {}
-    amount = get_amount(data)
-    conn = db_connection()
-    try:
-        result = wallet_deposit(conn, user['id'], amount, meta={"source": "manual"})
-        conn.commit()
-        return jsonify({
-            "available": float(result['available']),
-            "reserved": float(result['reserved']),
-            "txId": result['txId']
-        }), 201
-    finally:
-        conn.close()
-
-
-@wallet_bp.post('/withdraw')
-def withdraw():
-    user = current_user()
-    data = request.get_json(silent=True) or {}
-    amount = get_amount(data)
-    conn = db_connection()
-    try:
-        result = wallet_withdraw(conn, user['id'], amount, meta={"source": "manual"})
-        conn.commit()
-        return jsonify({
-            "available": float(result['available']),
-            "reserved": float(result['reserved']),
-            "txId": result['txId']
-        }), 200
-    finally:
-        conn.close()
-
-
 @wallet_bp.get('/transactions')
 def list_transactions():
     user = current_user()
@@ -123,4 +87,38 @@ def list_transactions():
         return jsonify(transactions)
     finally:
         cur.close()
+        conn.close()
+
+@wallet_bp.post('/deposit')
+def deposit():
+    user = current_user()
+    data = request.get_json(silent=True) or {}
+    amount = get_amount(data)
+    conn = db_connection()
+    try:
+        result = wallet_deposit(conn, user['id'], amount, meta={"source": "manual"})
+        conn.commit()
+        return jsonify({
+            "available": float(result['available']),
+            "reserved": float(result['reserved']),
+            "txId": result['txId']
+        }), 201
+    finally:
+        conn.close()
+
+@wallet_bp.post('/withdraw')
+def withdraw():
+    user = current_user()
+    data = request.get_json(silent=True) or {}
+    amount = get_amount(data)
+    conn = db_connection()
+    try:
+        result = wallet_withdraw(conn, user['id'], amount, meta={"source": "manual"})
+        conn.commit()
+        return jsonify({
+            "available": float(result['available']),
+            "reserved": float(result['reserved']),
+            "txId": result['txId']
+        }), 200
+    finally:
         conn.close()

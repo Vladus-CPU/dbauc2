@@ -7,12 +7,13 @@ from ..security import get_auth_user, require_admin
 from ..services.wallet import (
     wallet_balance,
     wallet_deposit,
-    wallet_withdraw,
-    wallet_reserve,
     wallet_release,
+    wallet_reserve,
     wallet_spend,
+    wallet_withdraw,
 )
 from ..utils import serialize, to_decimal
+
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
 @admin_bp.get('/users')
@@ -52,7 +53,6 @@ def admin_bootstrap():
             pass
         conn.close()
 
-
 @admin_bp.post('/users/<int:user_id>/promote')
 @require_admin
 def admin_promote(user_id: int):
@@ -84,14 +84,12 @@ def admin_demote(user_id: int):
         cur.close()
         conn.close()
 
-
 def _ensure_target_user(cur, user_id: int):
     cur.execute("SELECT id, username, email, is_admin FROM users WHERE id=%s", (user_id,))
     user = cur.fetchone()
     if not user:
         raise AppError("User not found", statuscode=404)
     return user
-
 
 def _admin_actor_meta(admin_user, note: str | None = None):
     meta = {
@@ -103,7 +101,6 @@ def _admin_actor_meta(admin_user, note: str | None = None):
         meta['note'] = note
     return meta
 
-
 def _parse_amount(payload):
     if 'amount' not in payload:
         raise OrderDataError("Field 'amount' is required")
@@ -111,7 +108,6 @@ def _parse_amount(payload):
     if amount <= Decimal('0'):
         raise OrderDataError("Amount must be positive")
     return amount
-
 
 @admin_bp.get('/wallet')
 @require_admin
@@ -149,7 +145,6 @@ def admin_wallet_overview():
     finally:
         cur.close()
         conn.close()
-
 
 @admin_bp.get('/wallet/<int:user_id>/transactions')
 @require_admin
@@ -201,7 +196,6 @@ def admin_wallet_transactions(user_id: int):
         cur.close()
         conn.close()
 
-
 @admin_bp.post('/wallet/<int:user_id>/actions')
 @require_admin
 def admin_wallet_actions(user_id: int):
@@ -211,7 +205,6 @@ def admin_wallet_actions(user_id: int):
         raise OrderDataError("Unsupported wallet action")
     amount = _parse_amount(data)
     note = data.get('note')
-
     conn = db_connection()
     cur = conn.cursor(dictionary=True)
     try:
@@ -223,7 +216,6 @@ def admin_wallet_actions(user_id: int):
             raise AppError("Unauthorized", statuscode=401)
         meta = _admin_actor_meta(admin_user, note)
         meta['targetUsername'] = target_user.get('username')
-
         try:
             if action == 'deposit':
                 result = wallet_deposit(conn, user_id, amount, meta)
@@ -239,7 +231,6 @@ def admin_wallet_actions(user_id: int):
         except Exception:
             conn.rollback()
             raise
-
         balances = wallet_balance(conn, user_id)
         return jsonify({
             "message": "Wallet updated",

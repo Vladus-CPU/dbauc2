@@ -126,6 +126,14 @@ CREATE TABLE IF NOT EXISTS auction_orders (
   INDEX idx_ao_auction_status (auction_id, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS trader_inventory (
+  trader_id INT NOT NULL,
+  product VARCHAR(255) NOT NULL,
+  quantity DECIMAL(18,6) NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (trader_id, product)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS resource_transactions (
   id INT AUTO_INCREMENT PRIMARY KEY,
   trader_id INT NOT NULL,

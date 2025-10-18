@@ -17,7 +17,6 @@ export async function getListings(options = {}) {
         try {
             response = await authorizedFetch(`/api/listings${query}`);
         } catch (networkError) {
-            console.warn('Резервний варіант завантаження списків API', networkError);
         }
         if (!response || !response.ok) {
             response = await fetch(`${API_BASE_URL}/listings${query}`);
@@ -39,7 +38,6 @@ export async function getListings(options = {}) {
         }
         return data;
     } catch (error) {
-        console.error('Не вдалося завантажити лоти:', error);
         if (detailed) throw error;
         return [];
     }
@@ -55,7 +53,6 @@ export async function getListingSummary(options = {}) {
         try {
             response = await authorizedFetch(`/api/listings/summary${query}`);
         } catch (networkError) {
-            console.warn('Резервний варіант завантаження зведення по лотах API', networkError);
         }
         if (!response || !response.ok) {
             response = await fetch(`${API_BASE_URL}/listings/summary${query}`);
@@ -65,9 +62,17 @@ export async function getListingSummary(options = {}) {
         }
         return await response.json();
     } catch (error) {
-        console.error('Не вдалося завантажити зведення по лотах:', error);
         throw error;
     }
+}
+
+export async function getListingById(listingId) {
+    const res = await authorizedFetch(`/api/listings/${listingId}`);
+    if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`Не вдалося отримати лот: ${res.status} ${txt}`);
+    }
+    return res.json();
 }
 
 export async function createListing(data) {
@@ -83,16 +88,19 @@ export async function createListing(data) {
         }
         return await response.json();
     } catch (error) {
-        console.error('Не вдалося створити лот:', error);
         throw error;
     }
 }
 
-export async function getListingById(listingId) {
-    const res = await authorizedFetch(`/api/listings/${listingId}`);
+export async function createListingAuction(listingId, payload) {
+    const res = await authorizedFetch(`/api/listings/${listingId}/auctions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
     if (!res.ok) {
         const txt = await res.text();
-        throw new Error(`Не вдалося отримати лот: ${res.status} ${txt}`);
+        throw new Error(`Create auction failed: ${res.status} ${txt}`);
     }
     return res.json();
 }
@@ -128,19 +136,6 @@ export async function deleteListing(listingId) {
     if (!res.ok) {
         const txt = await res.text();
         throw new Error(`Не вдалося видалити лот: ${res.status} ${txt}`);
-    }
-    return res.json();
-}
-
-export async function createListingAuction(listingId, payload) {
-    const res = await authorizedFetch(`/api/listings/${listingId}/auctions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    });
-    if (!res.ok) {
-        const txt = await res.text();
-        throw new Error(`Create auction failed: ${res.status} ${txt}`);
     }
     return res.json();
 }

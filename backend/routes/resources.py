@@ -12,26 +12,8 @@ from ..db import (
 from ..errors import AppError
 from ..security import get_auth_user
 from ..utils import clean_string, is_admin, is_trader, serialize
-resources_bp = Blueprint('resources', __name__, url_prefix='/api/resources')
 
-@resources_bp.get('/transactions')
-def list_resource_transactions():
-    conn = db_connection()
-    cur = conn.cursor(dictionary=True)
-    try:
-        ensure_users_table(conn)
-        user = get_auth_user(conn)
-        if not user or not is_trader(user):
-            raise AppError("Unauthorized", statuscode=401)
-        ensure_resource_transactions(conn)
-        cur.execute(
-            "SELECT id, type, quantity, occurred_at, notes FROM resource_transactions WHERE trader_id=%s ORDER BY occurred_at DESC",
-            (user['id'],)
-        )
-        return jsonify(serialize(cur.fetchall()))
-    finally:
-        cur.close()
-        conn.close()
+resources_bp = Blueprint('resources', __name__, url_prefix='/api/resources')
 
 @resources_bp.post('/transactions')
 def add_resource_transaction():
@@ -69,6 +51,32 @@ def add_resource_transaction():
         except Exception:
             pass
         raise AppError("Error adding transaction", statuscode=500, details=str(exception))
+    finally:
+        cur.close()
+        conn.close()
+
+@resources_bp.get('/documents/<int:doc_id>/download')
+def download_resource_document(doc_id: int):
+    conn = db_connection()
+    cur = conn.cursor(dictionary=True)
+    try:
+        ensure_users_table(conn)
+        ensure_resource_documents(conn)
+        user = get_auth_user(conn)
+        if not user:
+            raise AppError("Unauthorized", statuscode=401)
+        cur.execute("SELECT trader_id, filename, stored_name FROM resource_documents WHERE id=%s", (doc_id,))
+        row = cur.fetchone()
+        if not row:
+            raise AppError("Document not found", statuscode=404)
+        admin = is_admin(user)
+        if not admin and row['trader_id'] != user['id']:
+            raise AppError("Forbidden", statuscode=403)
+        trader_dir = os.path.join(current_app.config['RESOURCE_DOCS_ROOT'], str(row['trader_id']))
+        full_path = os.path.join(trader_dir, row['stored_name'])
+        if not os.path.isfile(full_path):
+            raise AppError("File not found on server", statuscode=404)
+        return send_from_directory(trader_dir, row['stored_name'], as_attachment=True, download_name=row['filename'])
     finally:
         cur.close()
         conn.close()
@@ -119,6 +127,25 @@ def list_resource_documents():
         cur.close()
         conn.close()
 
+@resources_bp.get('/transactions')
+def list_resource_transactions():
+    conn = db_connection()
+    cur = conn.cursor(dictionary=True)
+    try:
+        ensure_users_table(conn)
+        user = get_auth_user(conn)
+        if not user or not is_trader(user):
+            raise AppError("Unauthorized", statuscode=401)
+        ensure_resource_transactions(conn)
+        cur.execute(
+            "SELECT id, type, quantity, occurred_at, notes FROM resource_transactions WHERE trader_id=%s ORDER BY occurred_at DESC",
+            (user['id'],)
+        )
+        return jsonify(serialize(cur.fetchall()))
+    finally:
+        cur.close()
+        conn.close()
+
 @resources_bp.post('/documents')
 def upload_resource_document():
     conn = db_connection()
@@ -161,30 +188,4 @@ def upload_resource_document():
             pass
         raise AppError("Error uploading document", statuscode=500, details=str(exception))
     finally:
-        conn.close()
-
-@resources_bp.get('/documents/<int:doc_id>/download')
-def download_resource_document(doc_id: int):
-    conn = db_connection()
-    cur = conn.cursor(dictionary=True)
-    try:
-        ensure_users_table(conn)
-        ensure_resource_documents(conn)
-        user = get_auth_user(conn)
-        if not user:
-            raise AppError("Unauthorized", statuscode=401)
-        cur.execute("SELECT trader_id, filename, stored_name FROM resource_documents WHERE id=%s", (doc_id,))
-        row = cur.fetchone()
-        if not row:
-            raise AppError("Document not found", statuscode=404)
-        admin = is_admin(user)
-        if not admin and row['trader_id'] != user['id']:
-            raise AppError("Forbidden", statuscode=403)
-        trader_dir = os.path.join(current_app.config['RESOURCE_DOCS_ROOT'], str(row['trader_id']))
-        full_path = os.path.join(trader_dir, row['stored_name'])
-        if not os.path.isfile(full_path):
-            raise AppError("File not found on server", statuscode=404)
-        return send_from_directory(trader_dir, row['stored_name'], as_attachment=True, download_name=row['filename'])
-    finally:
-        cur.close()
         conn.close()
