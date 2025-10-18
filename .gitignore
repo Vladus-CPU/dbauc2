@@ -4,3 +4,12 @@ __pycache__/
 backend/__pycache__/config.cpython-313.pyc
 backend/__pycache__/app.cpython-313.pyc
 backend/__pycache__/errors.cpython-313.pyc
+*.md
+.venv/
+venv/
+.env
+.env.*
+.trunk/
+trunk/
+trunk
+backend/generated_docs/

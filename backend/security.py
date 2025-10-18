@@ -10,7 +10,6 @@ JWT_SECRET = os.environ.get('JWT_SECRET', 'dev_secret_change_me')
 JWT_ALGO = 'HS256'
 JWT_TTL_MIN = int(os.environ.get('JWT_TTL_MIN', '60'))
 
-
 def create_token(user):
     now = datetime.datetime.now(datetime.timezone.utc)
     exp = now + datetime.timedelta(minutes=JWT_TTL_MIN)
@@ -23,13 +22,11 @@ def create_token(user):
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
 
-
 def decode_token(token):
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
     except Exception as e:
         raise AppError("Invalid or expired token", statuscode=401, details=str(e))
-
 
 def get_auth_user(connection):
     auth = request.headers.get('Authorization', '')
@@ -54,7 +51,6 @@ def get_auth_user(connection):
     finally:
         cur.close()
 
-
 def require_auth(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -69,7 +65,6 @@ def require_auth(f):
             conn.close()
     return wrapper
 
-
 def require_admin(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -83,6 +78,5 @@ def require_admin(f):
         finally:
             conn.close()
     return wrapper
-
 
 __all__ = ['create_token', 'decode_token', 'get_auth_user', 'require_auth', 'require_admin', 'JWT_SECRET', 'JWT_ALGO', 'JWT_TTL_MIN']

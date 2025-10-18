@@ -70,7 +70,6 @@ function applyFilters() {
     }
     return true;
   });
-  // Sorting
   const sort = state.filters.sort;
   const getTime = (d)=> new Date(d||0).getTime();
   state.filtered.sort((a,b)=>{
@@ -311,11 +310,10 @@ function renderLists() {
   if (!collecting.length) {
     collectingList.textContent = 'Наразі немає активних вікон.';
   } else {
-    const refresh = softRefresh; // partial refresh
+    const refresh = softRefresh;
     collecting.forEach(a => {
       const card = createCollectingCard(a, state.session, refresh);
       if (a.status === 'collecting') card.classList.add('collecting-highlight');
-      // Animate insert
       card.style.animation='fadeIn .35s';
       collectingList.appendChild(card);
     });
@@ -326,7 +324,6 @@ function renderLists() {
   } else {
     history.slice(0, state.historySlice).forEach(a => clearedList.appendChild(createHistoryCard(a)));
   }
-  // Load more visibility
   const loadWrap = document.getElementById('history-load-more-wrap');
   if (loadWrap) {
     loadWrap.hidden = history.length <= state.historySlice;
@@ -379,7 +376,6 @@ async function hardRefresh(){
 }
 
 async function softRefresh(){
-  // Soft refresh only updates underlying data but keeps filters & slice
   try{
     const updated = await listAuctions();
     state.all = updated;
@@ -419,10 +415,8 @@ function attachUI(){
       if(!btn) return; 
       const status = btn.getAttribute('data-filter-status');
       state.filters.status = status;
-      // Update pill active states
       [...quickPills.querySelectorAll('button')].forEach(b=>b.classList.toggle('is-active', b===btn));
       applyFilters(); renderLists();
-      // Sync select if exists
       const statusSelDom = document.getElementById('auction-filter-status');
       if (statusSelDom) statusSelDom.value = status;
     });

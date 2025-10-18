@@ -3,6 +3,7 @@ from ..db import db_connection, ensure_orders_table, try_add_owner_columns, ensu
 from ..errors import AppError, DBError, OrderDataError
 from ..security import get_auth_user, require_admin
 from ..utils import serialize
+
 orders_bp = Blueprint('orders', __name__, url_prefix='/api')
 
 @orders_bp.get('/orders')
@@ -38,11 +39,11 @@ def create_order():
     finally:
         conn_auth.close()
 
-    dataorders = request.get_json(silent=True) or {}
-    ordertype = dataorders.get('type')
-    cost = dataorders.get('cost')
-    amount = dataorders.get('amount')
-    if ordertype not in ['buy', 'sell']:
+    data = request.get_json(silent=True) or {}
+    order_type = data.get('type')
+    cost = data.get('cost')
+    amount = data.get('amount')
+    if order_type not in ['buy', 'sell']:
         raise OrderDataError("Field 'type' must be 'buy' or 'sell'")
     if not isinstance(cost, (int, float)) or float(cost) <= 0:
         raise OrderDataError("Field 'cost' must be a positive number")
@@ -55,7 +56,7 @@ def create_order():
         try_add_owner_columns(connection)
         cursor.execute(
             "INSERT INTO orders (type, cost, amount, remaining_amount, status, creator_id) VALUES (%s, %s, %s, %s, %s, %s)",
-            (ordertype, float(cost), float(amount), float(amount), 'open', creator_id)
+            (order_type, float(cost), float(amount), float(amount), 'open', creator_id)
         )
         connection.commit()
         new_id = cursor.lastrowid

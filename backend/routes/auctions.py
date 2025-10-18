@@ -1,6 +1,8 @@
 import datetime
 import os
 import time
+import hmac
+import hashlib
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 from flask import Blueprint, current_app, g, jsonify, request, send_from_directory
@@ -8,20 +10,21 @@ from ..db import (
     db_connection,
     ensure_auctions_tables,
     ensure_listings_table,
+    ensure_resource_transactions,
+    ensure_trader_inventory,
     ensure_users_table,
     ensure_user_profiles,
     ensure_wallet_tables,
 )
 from ..errors import AppError, DBError, OrderDataError
-from ..security import get_auth_user, require_admin
-from ..services.auction import compute_call_market_clearing
+from ..security import get_auth_user, require_admin, JWT_SECRET
+from ..services.auction import compute_k_double_clearing
 from ..services.wallet import wallet_deposit, wallet_release, wallet_reserve, wallet_spend
 from ..utils import is_admin, is_trader, serialize, to_decimal
 
 auctions_bp = Blueprint('auctions', __name__, url_prefix='/api')
 
 DECIMAL_QUANT = Decimal('0.000001')
-
 
 def _normalize_decimal(value: Optional[Decimal]) -> Optional[Decimal]:
     if value is None:
@@ -144,7 +147,10 @@ def auction_order_book(auction_id: int):
     conn = db_connection()
     cur = conn.cursor(dictionary=True)
     try:
+        ensure_users_table(conn)
         ensure_auctions_tables(conn)
+        user = get_auth_user(conn)
+        admin_view = bool(user and is_admin(user))
         cur.execute(
             "SELECT id, product, type, status, k_value, window_start, window_end, created_at, closed_at "
             "FROM auctions WHERE id=%s",
@@ -196,7 +202,6 @@ def auction_order_book(auction_id: int):
                 spread_val = (best_ask_dec - best_bid_dec)
             spread = float(spread_val)
             if spread < 0:
-                # crossed market (best bid >= best ask) – keep signed spread but flag it
                 is_crossed_market = True
         mid_price = None
         if best_bid_dec is not None and best_ask_dec is not None:
@@ -219,13 +224,14 @@ def auction_order_book(auction_id: int):
         try:
             base_k = to_decimal(auction['k_value']) if auction.get('k_value') is not None else Decimal('0.5')
             if depth_imbalance is not None:
-                alpha = Decimal('0.15')  # sensitivity factor (tunable)
+                alpha = Decimal('0.15')
                 adj = Decimal(str(depth_imbalance)) * alpha
-                candidate = base_k - adj  # subtract because positive imbalance (more bids) should lower k
-                if candidate < Decimal('0'): candidate = Decimal('0')
-                if candidate > Decimal('1'): candidate = Decimal('1')
+                candidate = base_k - adj
+                if candidate < Decimal('0'):
+                    candidate = Decimal('0')
+                if candidate > Decimal('1'):
+                    candidate = Decimal('1')
                 adaptive_k = float(candidate)
-                # Optional persistence: only write back if difference > 0.01 to reduce churn
                 if abs(candidate - base_k) >= Decimal('0.01'):
                     try:
                         cur.execute("UPDATE auctions SET k_value=%s WHERE id=%s", (str(candidate), auction_id))
@@ -242,7 +248,6 @@ def auction_order_book(auction_id: int):
         cum_ask_depth = sum((lvl['totalQuantity'] for lvl in ask_levels[:top_n]), 0.0) if ask_levels else None
         cum_bid_orders = sum((lvl['orderCount'] for lvl in bid_levels[:top_n]), 0) if bid_levels else None
         cum_ask_orders = sum((lvl['orderCount'] for lvl in ask_levels[:top_n]), 0) if ask_levels else None
-
         cur.execute(
             "SELECT id, trader_id, side, price, quantity, created_at, cleared_price, cleared_quantity "
             "FROM auction_orders WHERE auction_id=%s AND status='cleared' AND cleared_quantity IS NOT NULL "
@@ -259,7 +264,6 @@ def auction_order_book(auction_id: int):
                 "quantity": float(to_decimal(row['cleared_quantity'])),
                 "createdAt": row['created_at'].isoformat() if row['created_at'] else None
             })
-
         metrics = {
             "bestBid": best_bid,
             "bestAsk": best_ask,
@@ -300,8 +304,23 @@ def auction_order_book(auction_id: int):
                 "bids": _serialize_orders(recent_bid_orders),
                 "asks": _serialize_orders(recent_ask_orders)
             },
-            "recentClearing": cleared_entries
+            "recentClearing": cleared_entries,
+            "visibility": 'admin' if admin_view else 'sealed'
         }
+        if not admin_view:
+            response['book'] = {"bids": [], "asks": []}
+            response['recentOrders'] = {"bids": [], "asks": []}
+            restricted_metrics = dict(metrics)
+            for key in [
+                "bestBid", "bestAsk", "spread", "isCrossedMarket", "midPrice",
+                "totalBidQuantity", "totalAskQuantity", "bidOrderCount", "askOrderCount",
+                "bestBidDepth", "bestAskDepth", "bestBidOrders", "bestAskOrders",
+                "depthImbalance", "top3BidDepth", "top3AskDepth", "top3BidOrders",
+                "top3AskOrders", "adaptiveK"
+            ]:
+                if key in restricted_metrics:
+                    restricted_metrics[key] = None
+            response['metrics'] = restricted_metrics
         return jsonify(response)
     finally:
         cur.close()
@@ -561,6 +580,15 @@ def place_auction_order(auction_id: int):
             }
             reserve_result = wallet_reserve(conn, user['id'], reserve_amount, meta=reserve_meta)
             reserve_tx_id = reserve_result['txId']
+        cur.execute(
+            "SELECT COALESCE(MAX(iteration), 0) AS max_iter FROM auction_orders WHERE auction_id=%s",
+            (auction_id,)
+        )
+        iteration_row = cur.fetchone() or {}
+        try:
+            next_iteration = int(iteration_row.get('max_iter') or 0) + 1
+        except (TypeError, ValueError):
+            next_iteration = 1
         cur.close()
         cur = conn.cursor()
         columns = ["auction_id", "trader_id", "side", "price", "quantity"]
@@ -568,6 +596,8 @@ def place_auction_order(auction_id: int):
         if reserve_amount is not None:
             columns.extend(["reserved_amount", "reserve_tx_id"])
             values.extend([str(reserve_amount), reserve_tx_id])
+        columns.append("iteration")
+        values.append(next_iteration)
         placeholders = ','.join(['%s'] * len(values))
         cur.execute(
             f"INSERT INTO auction_orders ({', '.join(columns)}) VALUES ({placeholders})",
@@ -615,6 +645,7 @@ def list_auction_orders_admin(auction_id: int):
                    price,
                    quantity,
                    created_at,
+                   iteration,
                    status,
                    reserved_amount,
                    reserve_tx_id,
@@ -631,21 +662,221 @@ def list_auction_orders_admin(auction_id: int):
         cur.close()
         conn.close()
 
-def _generate_trade_document(auction_id: int, role: str, trader_id: int, amount: Decimal, price: Decimal) -> str:
+def _generate_trade_document(
+    auction_id: int,
+    role: str,
+    trader_id: int,
+    amount: Decimal,
+    price: Decimal,
+    product: str,
+) -> str:
+    """Generate a signed trade confirmation document per trader and role.
+
+    Output file name:
+      backend/generated_docs/auction_{id}/auction_{id}_{role}_trader_{trader_id}_{timestamp}.txt
+
+    Content follows the required Ukrainian template.
+    """
     base_dir = os.path.join(current_app.config['GENERATED_DOCS_ROOT'], f'auction_{auction_id}')
     os.makedirs(base_dir, exist_ok=True)
-    timestamp = datetime.datetime.utcnow().isoformat() + 'Z'
-    filename = f"auction_{auction_id}_{role}_trader_{trader_id}_{int(datetime.datetime.utcnow().timestamp())}.txt"
+    # Timestamps
+    now = datetime.datetime.utcnow()
+    timestamp_iso = now.isoformat() + 'Z'
+    epoch_ts = int(now.timestamp())
+    filename = f"auction_{auction_id}_{role}_trader_{trader_id}_{epoch_ts}.txt"
     path = os.path.join(base_dir, filename)
-    with open(path, 'w', encoding='utf-8') as file_handle:
-        file_handle.write("Підтвердження угоди\n")
-        file_handle.write(f"Аукціон: {auction_id}\n")
-        file_handle.write(f"Роль: {role}\n")
-        file_handle.write(f"ID Торговця: {trader_id}\n")
-        file_handle.write(f"Кількість: {amount}\n")
-        file_handle.write(f"Ціна: {price}\n")
-        file_handle.write(f"Час: {timestamp}\n")
+
+    # Operation type mapping
+    op_type = 'Покупка' if role.strip().lower() == 'покупець' else 'Продаж'
+
+    # Normalize decimals and compute totals
+    try:
+        amt = amount if isinstance(amount, Decimal) else Decimal(str(amount))
+    except Exception:
+        amt = Decimal('0')
+    try:
+        prc = price if isinstance(price, Decimal) else Decimal(str(price))
+    except Exception:
+        prc = Decimal('0')
+    total_cost = (prc * amt).quantize(DECIMAL_QUANT)
+
+    # HMAC signature over the core fields using JWT_SECRET as signing key
+    payload = f"{auction_id}|{trader_id}|{op_type}|{product}|{str(prc)}|{str(amt)}|{timestamp_iso}"
+    try:
+        key_bytes = (JWT_SECRET or 'local_dev_secret').encode('utf-8')
+    except Exception:
+        key_bytes = b'local_dev_secret'
+    signature = hmac.new(key_bytes, payload.encode('utf-8'), hashlib.sha256).hexdigest()
+
+    # Write document
+    with open(path, 'w', encoding='utf-8') as fh:
+        fh.write("=== ПІДТВЕРДЖЕННЯ УГОДИ ===\n")
+        fh.write(f"Аукціон: {product}\n")
+        fh.write(f"Тип операції: {op_type}\n")
+        fh.write(f"Трейдер ID: {trader_id}\n")
+        fh.write(f"Дата угоди: {timestamp_iso}\n")
+        fh.write("\n")
+        fh.write("Деталі угоди:\n")
+        fh.write(f"- Продукт: {product}\n")
+        fh.write(f"- Ціна: {str(prc)}\n")
+        fh.write(f"- Кількість: {str(amt)}\n")
+        fh.write(f"- Загальна вартість: {str(total_cost)}\n")
+        fh.write("\n")
+        fh.write(f"Підпис системи: {signature}\n")
     return path
+
+def _record_inventory_movement(conn, trader_id: int, product: str, delta_qty: Decimal,
+                               *, auction_id: int, order_id: int) -> None:
+    if delta_qty is None:
+        return
+    try:
+        if isinstance(delta_qty, (int, float)):
+            delta_value = Decimal(str(delta_qty))
+        else:
+            delta_value = Decimal(delta_qty)
+    except Exception:
+        delta_value = Decimal('0')
+    if delta_value == Decimal('0'):
+        return
+    inv_cur = conn.cursor()
+    try:
+        inv_cur.execute(
+            """
+            INSERT INTO trader_inventory (trader_id, product, quantity)
+            VALUES (%s,%s,%s)
+            ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity), updated_at = CURRENT_TIMESTAMP
+            """,
+            (trader_id, product, str(delta_value))
+        )
+    finally:
+        inv_cur.close()
+    if delta_value < 0:
+        check_cur = conn.cursor(dictionary=True)
+        try:
+            check_cur.execute(
+                "SELECT quantity FROM trader_inventory WHERE trader_id=%s AND product=%s",
+                (trader_id, product)
+            )
+            row = check_cur.fetchone()
+        finally:
+            check_cur.close()
+        if row:
+            try:
+                current_qty = Decimal(str(row['quantity']))
+            except Exception:
+                current_qty = Decimal('0')
+            if current_qty <= Decimal('0'):
+                cleanup_cur = conn.cursor()
+                try:
+                    cleanup_cur.execute(
+                        "DELETE FROM trader_inventory WHERE trader_id=%s AND product=%s",
+                        (trader_id, product)
+                    )
+                finally:
+                    cleanup_cur.close()
+    notes = f"Auction #{auction_id}, order #{order_id}, product {product}"
+    res_cur = conn.cursor()
+    try:
+        res_cur.execute(
+            "INSERT INTO resource_transactions (trader_id, type, quantity, notes) VALUES (%s,%s,%s,%s)",
+            (
+                trader_id,
+                'inventory_add' if delta_value > 0 else 'inventory_remove',
+                str(abs(delta_value)),
+                notes
+            )
+        )
+    finally:
+        res_cur.close()
+
+@auctions_bp.delete('/auctions/<int:auction_id>/orders/<int:order_id>')
+def cancel_auction_order(auction_id: int, order_id: int):
+    """Allow a trader to cancel their own open order while auction is collecting.
+    For bid-side orders, release reserved funds. Marks order as 'rejected'.
+    """
+    conn = db_connection()
+    cur = conn.cursor(dictionary=True)
+    try:
+        ensure_users_table(conn)
+        ensure_auctions_tables(conn)
+        user = get_auth_user(conn)
+        if not user or not is_trader(user):
+            raise AppError("Unauthorized", statuscode=401)
+
+        # Check auction state
+        cur.execute("SELECT id, status FROM auctions WHERE id=%s", (auction_id,))
+        auction = cur.fetchone()
+        if not auction:
+            raise AppError("Auction not found", statuscode=404)
+        if auction['status'] != 'collecting':
+            raise AppError("Auction is not collecting orders", statuscode=400)
+
+        # Load order
+        cur.execute(
+            """
+            SELECT id, trader_id, side, price, quantity, status, reserved_amount
+            FROM auction_orders
+            WHERE id=%s AND auction_id=%s
+            """,
+            (order_id, auction_id)
+        )
+        order = cur.fetchone()
+        if not order:
+            raise AppError("Order not found", statuscode=404)
+        if int(order['trader_id']) != int(user['id']):
+            raise AppError("Forbidden", statuscode=403)
+        if order['status'] != 'open':
+            raise AppError("Only open orders can be canceled", statuscode=400)
+
+        # Mark as rejected (canceled)
+        upd = conn.cursor()
+        try:
+            upd.execute(
+                "UPDATE auction_orders SET status='rejected' WHERE id=%s",
+                (order_id,)
+            )
+        finally:
+            upd.close()
+
+        # Release reserved funds for bid orders
+        if order['side'] == 'bid':
+            try:
+                reserved_total = to_decimal(order['reserved_amount']) if order.get('reserved_amount') is not None else None
+            except Exception:
+                reserved_total = None
+            if reserved_total is None:
+                # Fallback compute
+                try:
+                    reserved_total = (to_decimal(order['price']) * to_decimal(order['quantity'])).quantize(DECIMAL_QUANT)
+                except Exception:
+                    reserved_total = None
+            if reserved_total is not None and reserved_total > 0:
+                wallet_release(conn, user['id'], reserved_total, meta={
+                    "auctionId": auction_id,
+                    "orderId": order_id,
+                    "action": "cancel"
+                })
+
+        conn.commit()
+        return jsonify({"message": "Order canceled"})
+    except AppError as error:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise error
+    except Exception as exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise DBError("Error canceling order", details=str(exception)) from exception
+    finally:
+        try:
+            cur.close()
+        except Exception:
+            pass
+        conn.close()
 
 @auctions_bp.post('/admin/auctions/<int:auction_id>/clear')
 @require_admin
@@ -654,7 +885,9 @@ def clear_auction(auction_id: int):
     cur = conn.cursor(dictionary=True)
     try:
         ensure_auctions_tables(conn)
-        cur.execute("SELECT id, k_value, status, admin_id FROM auctions WHERE id=%s", (auction_id,))
+        ensure_trader_inventory(conn)
+        ensure_resource_transactions(conn)
+        cur.execute("SELECT id, product, k_value, status, admin_id FROM auctions WHERE id=%s", (auction_id,))
         auction = cur.fetchone()
         if not auction:
             raise AppError("Auction not found", statuscode=404)
@@ -664,7 +897,7 @@ def clear_auction(auction_id: int):
         if auction.get('admin_id') and admin_user and auction['admin_id'] != admin_user['id']:
             raise AppError("Auction assigned to different administrator", statuscode=403)
         cur.execute(
-            "SELECT id, trader_id, side, price, quantity, created_at, reserved_amount, reserve_tx_id "
+            "SELECT id, trader_id, side, price, quantity, created_at, iteration, reserved_amount, reserve_tx_id "
             "FROM auction_orders WHERE auction_id=%s AND status='open'",
             (auction_id,)
         )
@@ -701,8 +934,14 @@ def clear_auction(auction_id: int):
                 'price': to_decimal(row['price']),
                 'quantity': to_decimal(row['quantity']),
                 'created_at': row['created_at'],
+                'iteration': row.get('iteration'),
             })
-        clearing = compute_call_market_clearing(orders)
+        try:
+            k_value = auction.get('k_value')
+            k_decimal = to_decimal(k_value if k_value is not None else Decimal('0.5'))
+        except OrderDataError:
+            k_decimal = Decimal('0.5')
+        clearing = compute_k_double_clearing(orders, k_decimal)
         price = clearing['price']
         allocations = clearing['allocations']
         volume = clearing.get('volume', Decimal('0'))
@@ -777,17 +1016,35 @@ def clear_auction(auction_id: int):
                     remaining = Decimal('0')
                 if remaining > Decimal('0'):
                     wallet_release(conn, row['trader_id'], remaining, meta=dict(order_meta, action='release'))
+                if cleared_qty > Decimal('0'):
+                    _record_inventory_movement(
+                        conn,
+                        row['trader_id'],
+                        auction['product'],
+                        cleared_qty_quant,
+                        auction_id=auction_id,
+                        order_id=row['id']
+                    )
             elif row['side'] == 'ask' and cleared_qty > Decimal('0'):
                 cleared_qty_quant = to_decimal(cleared_qty)
                 proceeds = (price * cleared_qty_quant).quantize(DECIMAL_QUANT)
                 if proceeds > Decimal('0'):
                     wallet_deposit(conn, row['trader_id'], proceeds, meta=dict(order_meta, action='credit'))
+                _record_inventory_movement(
+                    conn,
+                    row['trader_id'],
+                    auction['product'],
+                    -cleared_qty_quant,
+                    auction_id=auction_id,
+                    order_id=row['id']
+                )
         conn.commit()
+        # Generate per-trade confirmation documents
         for row in raw_orders:
             cleared_qty = allocation_map.get(row['id'], Decimal('0'))
-            if cleared_qty > 0:
+            if cleared_qty > Decimal('0'):
                 role = 'покупець' if row['side'] == 'bid' else 'продавець'
-                _generate_trade_document(auction_id, role, row['trader_id'], cleared_qty, price)
+                _generate_trade_document(auction_id, role, row['trader_id'], cleared_qty, price, auction['product'])
         return jsonify({
             "message": "Auction cleared",
             "price": float(price),
@@ -926,6 +1183,15 @@ def seed_random_orders(auction_id: int):
 
         created = []
         order_rows = []
+        cur.execute(
+            "SELECT COALESCE(MAX(iteration), 0) AS max_iter FROM auction_orders WHERE auction_id=%s",
+            (auction_id,)
+        )
+        iter_row = cur.fetchone() or {}
+        try:
+            next_iteration = int(iter_row.get('max_iter') or 0) + 1
+        except (TypeError, ValueError):
+            next_iteration = 1
         # Simple password hash reuse (bcrypt) via auth route code path is avoided; create directly.
         from passlib.hash import bcrypt
         for i in range(count):
@@ -955,20 +1221,22 @@ def seed_random_orders(auction_id: int):
                 price = max(0.000001, price_center + price_delta)
                 qty = random.uniform(qty_min, qty_max)
                 cur.execute(
-                    "INSERT INTO auction_orders (auction_id, trader_id, side, price, quantity) VALUES (%s,%s,'bid',%s,%s)",
-                    (auction_id, user_id, price, qty)
+                    "INSERT INTO auction_orders (auction_id, trader_id, side, price, quantity, iteration) VALUES (%s,%s,'bid',%s,%s,%s)",
+                    (auction_id, user_id, price, qty, next_iteration)
                 )
                 order_rows.append({"side": "bid", "price": price, "quantity": qty})
+                next_iteration += 1
             for _ in range(asks_per):
                 # bias ask prices to be at or above center
                 price_delta = price_center * (random.uniform(0, price_spread_pct) / 100.0)
                 price = max(0.000001, price_center + price_delta)
                 qty = random.uniform(qty_min, qty_max)
                 cur.execute(
-                    "INSERT INTO auction_orders (auction_id, trader_id, side, price, quantity) VALUES (%s,%s,'ask',%s,%s)",
-                    (auction_id, user_id, price, qty)
+                    "INSERT INTO auction_orders (auction_id, trader_id, side, price, quantity, iteration) VALUES (%s,%s,'ask',%s,%s,%s)",
+                    (auction_id, user_id, price, qty, next_iteration)
                 )
                 order_rows.append({"side": "ask", "price": price, "quantity": qty})
+                next_iteration += 1
         if not allow_cross:
             # After insertion, optionally clean any accidental cross by adjusting a few orders outward
             # (lightweight approach: ensure max bid < min ask by small tick if violated)
@@ -1002,7 +1270,7 @@ def seed_random_orders(auction_id: int):
             conn.rollback()
         except Exception:
             pass
-        raise DBError("Error seeding random orders", details=str(e))
+        raise DBError("Error seeding random orders", details=str(e)) from e
     finally:
         try:
             cur.close()
@@ -1053,55 +1321,43 @@ def cleanup_bots(auction_id: int):
         if not bot_ids:
             return jsonify({"message": "No bot users for this auction", "auctionId": auction_id, "removedOrders": 0, "removedParticipants": 0, "removedUsers": 0})
 
-        # Delete orders for those users in this auction
-        cur.close(); cur = conn.cursor()
-        cur.execute(
-            f"DELETE FROM auction_orders WHERE auction_id=%s AND trader_id IN ({','.join(['%s']*len(bot_ids))})",
-            (auction_id, *bot_ids)
-        )
-        removed_orders = cur.rowcount
-        # Delete participants
-        cur.execute(
-            f"DELETE FROM auction_participants WHERE auction_id=%s AND trader_id IN ({','.join(['%s']*len(bot_ids))})",
-            (auction_id, *bot_ids)
-        )
-        removed_participants = cur.rowcount
+        # Delete orders for those users in this auction (per-id to avoid dynamic IN)
+        cur.close()
+        cur = conn.cursor()
+        removed_orders = 0
+        for uid in bot_ids:
+            cur.execute(
+                "DELETE FROM auction_orders WHERE auction_id=%s AND trader_id=%s",
+                (auction_id, uid)
+            )
+            removed_orders += cur.rowcount
+        # Delete participants (per-id)
+        removed_participants = 0
+        for uid in bot_ids:
+            cur.execute(
+                "DELETE FROM auction_participants WHERE auction_id=%s AND trader_id=%s",
+                (auction_id, uid)
+            )
+            removed_participants += cur.rowcount
 
         removed_users = 0
         if remove_users:
-            # Find which of these users have any remaining auction presence
-            cur.execute(
-                f"""
-                SELECT u.id, (
-                  SELECT COUNT(*) FROM auction_orders ao WHERE ao.trader_id=u.id
-                ) + (
-                  SELECT COUNT(*) FROM auction_participants ap WHERE ap.trader_id=u.id
-                ) AS refcount
-                FROM users u WHERE u.id IN ({','.join(['%s']*len(bot_ids))})
-                """,
-                tuple(bot_ids)
-            )
-            still_rows = cur.fetchall()
-            deletable = [r['id'] for r in still_rows if int(r.get('refcount') or 0) == 0]
+            # Determine which users have no remaining references
+            deletable = []
+            for uid in bot_ids:
+                cur.execute("SELECT COUNT(*) FROM auction_orders WHERE trader_id=%s", (uid,))
+                c1 = cur.fetchone()[0]
+                cur.execute("SELECT COUNT(*) FROM auction_participants WHERE trader_id=%s", (uid,))
+                c2 = cur.fetchone()[0]
+                if int(c1) + int(c2) == 0:
+                    deletable.append(uid)
             if deletable:
-                # Remove wallet transactions and accounts
-                cur.execute(
-                    f"DELETE FROM wallet_transactions WHERE user_id IN ({','.join(['%s']*len(deletable))})",
-                    tuple(deletable)
-                )
-                cur.execute(
-                    f"DELETE FROM wallet_accounts WHERE user_id IN ({','.join(['%s']*len(deletable))})",
-                    tuple(deletable)
-                )
-                # Remove trader profiles
-                cur.execute(
-                    f"DELETE FROM traders_profile WHERE user_id IN ({','.join(['%s']*len(deletable))})",
-                    tuple(deletable)
-                )
-                cur.execute(
-                    f"DELETE FROM users WHERE id IN ({','.join(['%s']*len(deletable))})",
-                    tuple(deletable)
-                )
+                # Remove wallet transactions and accounts, profiles, and users per-id
+                for uid in deletable:
+                    cur.execute("DELETE FROM wallet_transactions WHERE user_id=%s", (uid,))
+                    cur.execute("DELETE FROM wallet_accounts WHERE user_id=%s", (uid,))
+                    cur.execute("DELETE FROM traders_profile WHERE user_id=%s", (uid,))
+                    cur.execute("DELETE FROM users WHERE id=%s", (uid,))
                 removed_users = cur.rowcount
 
         conn.commit()
@@ -1115,13 +1371,17 @@ def cleanup_bots(auction_id: int):
             "usernamePrefix": prefix
         })
     except AppError:
-        try: conn.rollback()
-        except Exception: pass
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         raise
     except Exception as e:
-        try: conn.rollback()
-        except Exception: pass
-        raise DBError("Error cleaning up bot data", details=str(e))
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise DBError("Error cleaning up bot data", details=str(e)) from e
 
 @auctions_bp.get('/auctions/<int:auction_id>/history')
 def auction_history(auction_id: int):
@@ -1133,7 +1393,11 @@ def auction_history(auction_id: int):
     conn = db_connection()
     cur = conn.cursor(dictionary=True)
     try:
+        ensure_users_table(conn)
         ensure_auctions_tables(conn)
+        user = get_auth_user(conn)
+        if not user or not is_admin(user):
+            raise AppError("Forbidden", statuscode=403)
         cur.execute("SELECT id,status FROM auctions WHERE id=%s", (auction_id,))
         auction_row = cur.fetchone()
         if not auction_row:
@@ -1193,25 +1457,29 @@ def purge_all_bots():
     conn = db_connection()
     cur = conn.cursor()
     try:
-        ensure_users_table(conn); ensure_auctions_tables(conn); ensure_wallet_tables(conn); ensure_user_profiles(conn)
+        ensure_users_table(conn)
+        ensure_auctions_tables(conn)
+        ensure_wallet_tables(conn)
+        ensure_user_profiles(conn)
         cur.execute("SELECT id FROM users WHERE username LIKE %s", (like_pattern,))
         ids = [row[0] for row in cur.fetchall()]
         if not ids:
             return jsonify({"message": "No bot users", "removedUsers": 0})
-        id_list = ','.join(['%s']*len(ids))
-        # Delete dependent rows
-        cur.execute(f"DELETE FROM auction_orders WHERE trader_id IN ({id_list})", tuple(ids))
-        orders_removed = cur.rowcount
-        cur.execute(f"DELETE FROM auction_participants WHERE trader_id IN ({id_list})", tuple(ids))
-        parts_removed = cur.rowcount
-        cur.execute(f"DELETE FROM wallet_transactions WHERE user_id IN ({id_list})", tuple(ids))
-        tx_removed = cur.rowcount
-        cur.execute(f"DELETE FROM wallet_accounts WHERE user_id IN ({id_list})", tuple(ids))
-        wallets_removed = cur.rowcount
-        cur.execute(f"DELETE FROM traders_profile WHERE user_id IN ({id_list})", tuple(ids))
-        profiles_removed = cur.rowcount
-        cur.execute(f"DELETE FROM users WHERE id IN ({id_list})", tuple(ids))
-        users_removed = cur.rowcount
+        # Delete dependent rows per id to avoid dynamic IN
+        orders_removed = parts_removed = tx_removed = wallets_removed = profiles_removed = users_removed = 0
+        for uid in ids:
+            cur.execute("DELETE FROM auction_orders WHERE trader_id=%s", (uid,))
+            orders_removed += cur.rowcount
+            cur.execute("DELETE FROM auction_participants WHERE trader_id=%s", (uid,))
+            parts_removed += cur.rowcount
+            cur.execute("DELETE FROM wallet_transactions WHERE user_id=%s", (uid,))
+            tx_removed += cur.rowcount
+            cur.execute("DELETE FROM wallet_accounts WHERE user_id=%s", (uid,))
+            wallets_removed += cur.rowcount
+            cur.execute("DELETE FROM traders_profile WHERE user_id=%s", (uid,))
+            profiles_removed += cur.rowcount
+            cur.execute("DELETE FROM users WHERE id=%s", (uid,))
+            users_removed += cur.rowcount
         conn.commit()
         return jsonify({
             "message": "Bots purged",
@@ -1225,16 +1493,22 @@ def purge_all_bots():
             "botIds": ids
         })
     except AppError:
-        try: conn.rollback()
-        except Exception: pass
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         raise
     except Exception as e:
-        try: conn.rollback()
-        except Exception: pass
-        raise DBError("Error purging bots", details=str(e))
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise DBError("Error purging bots", details=str(e)) from e
     finally:
-        try: cur.close()
-        except Exception: pass
+        try:
+            cur.close()
+        except Exception:
+            pass
         conn.close()
 
 @auctions_bp.get('/auctions/<int:auction_id>/distribution')
@@ -1243,9 +1517,14 @@ def auction_price_distribution(auction_id: int):
 
     Output: { mid, bestBid, bestAsk, bids:[{p,qty,count}], asks:[{p,qty,count}] }
     """
-    conn = db_connection(); cur = conn.cursor(dictionary=True)
+    conn = db_connection()
+    cur = conn.cursor(dictionary=True)
     try:
+        ensure_users_table(conn)
         ensure_auctions_tables(conn)
+        user = get_auth_user(conn)
+        if not user or not is_admin(user):
+            raise AppError("Forbidden", statuscode=403)
         cur.execute("SELECT id FROM auctions WHERE id=%s", (auction_id,))
         if not cur.fetchone():
             raise AppError("Auction not found", statuscode=404)
@@ -1253,16 +1532,21 @@ def auction_price_distribution(auction_id: int):
         rows = cur.fetchall()
         from collections import defaultdict
         agg = { 'bid': defaultdict(lambda: {'p': None,'qty':0.0,'count':0}), 'ask': defaultdict(lambda: {'p': None,'qty':0.0,'count':0}) }
-        best_bid = None; best_ask = None
+        best_bid = None
+        best_ask = None
         for r in rows:
-            side = r['side']; price = float(r['price']); qty = float(r['quantity'])
+            side = r['side']
+            price = float(r['price'])
+            qty = float(r['quantity'])
             if side == 'bid':
                 best_bid = price if (best_bid is None or price>best_bid) else best_bid
             else:
                 best_ask = price if (best_ask is None or price<best_ask) else best_ask
             bucket = round(price, 4)  # bucket precision
             cell = agg[side][bucket]
-            cell['p'] = bucket; cell['qty'] += qty; cell['count'] += 1
+            cell['p'] = bucket
+            cell['qty'] += qty
+            cell['count'] += 1
         bids = sorted(agg['bid'].values(), key=lambda x: x['p'], reverse=True)
         asks = sorted(agg['ask'].values(), key=lambda x: x['p'])
         mid = None
@@ -1277,6 +1561,8 @@ def auction_price_distribution(auction_id: int):
             'asks': asks
         })
     finally:
-        try: cur.close()
-        except Exception: pass
+        try:
+            cur.close()
+        except Exception:
+            pass
         conn.close()

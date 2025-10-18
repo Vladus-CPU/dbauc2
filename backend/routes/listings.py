@@ -1,7 +1,5 @@
 from decimal import Decimal
-
 from flask import Blueprint, jsonify, request
-
 from ..db import (
     db_connection,
     ensure_auctions_tables,
@@ -12,11 +10,9 @@ from ..errors import AppError, DBError
 from ..security import get_auth_user, require_admin
 from ..utils import clean_string, is_admin, to_decimal
 
-
 listings_bp = Blueprint('listings', __name__, url_prefix='/api')
 
 ALLOWED_STATUSES = {'draft', 'published', 'archived'}
-
 
 def _as_float(value):
     try:
@@ -25,7 +21,6 @@ def _as_float(value):
         return float(value)
     except Exception:
         return None
-
 
 def _row_to_listing(row):
     if not row:
@@ -57,7 +52,6 @@ def _row_to_listing(row):
         listing["lastAuction"] = None
     return listing
 
-
 def _current_user():
     auth_conn = db_connection()
     try:
@@ -69,7 +63,6 @@ def _current_user():
     finally:
         auth_conn.close()
 
-
 def _normalize_status(status_value: str | None, *, required: bool = False) -> str | None:
     if status_value is None:
         if required:
@@ -80,7 +73,6 @@ def _normalize_status(status_value: str | None, *, required: bool = False) -> st
         raise AppError("Invalid status value", statuscode=400)
     return status_value
 
-
 def _normalize_decimal(value, field_name: str, *, allow_null: bool = True, min_value: Decimal | None = None) -> Decimal | None:
     if value is None or (isinstance(value, str) and not value.strip()):
         if allow_null:
@@ -90,7 +82,6 @@ def _normalize_decimal(value, field_name: str, *, allow_null: bool = True, min_v
     if min_value is not None and dec < min_value:
         raise AppError(f"Field '{field_name}' must be >= {min_value}", statuscode=400)
     return dec
-
 
 def _fetch_listing_with_meta(connection, listing_id: int):
     cur = connection.cursor(dictionary=True)
@@ -121,39 +112,31 @@ def _fetch_listing_with_meta(connection, listing_id: int):
     finally:
         cur.close()
 
-
 @listings_bp.get('/listings/summary')
 def listings_summary():
     connection = db_connection()
     cursor = connection.cursor(dictionary=True)
     try:
         ensure_listings_table(connection)
-
         search_term = clean_string(request.args.get('search'))
         status_param = request.args.get('status')
-
         where_clauses = []
         params = []
-
         if search_term:
             where_clauses.append('(l.title LIKE %s OR l.description LIKE %s)')
             like_term = f"%{search_term}%"
             params.extend([like_term, like_term])
-
         if status_param and status_param.lower() not in ('all', '*'):
             status_filter = _normalize_status(status_param)
             where_clauses.append('l.status = %s')
             params.append(status_filter)
-
         sql = 'SELECT l.status, COUNT(*) AS count FROM listings l'
         if where_clauses:
             sql += ' WHERE ' + ' AND '.join(where_clauses)
         sql += ' GROUP BY l.status'
-
         cursor.execute(sql, tuple(params))
         rows = cursor.fetchall()
         counts = {row.get('status'): int(row.get('count') or 0) for row in rows if row.get('status')}
-
         summary = {
             "total": sum(counts.values()),
             "draft": counts.get('draft', 0),
@@ -169,7 +152,6 @@ def listings_summary():
         cursor.close()
         connection.close()
 
-
 @listings_bp.get('/listings')
 def list_listings():
     connection = db_connection()
@@ -178,7 +160,6 @@ def list_listings():
         ensure_listings_table(connection)
         ensure_users_table(connection)
         ensure_auctions_tables(connection)
-
         detailed = str(request.args.get('detailed', '')).lower() in ('1', 'true', 'yes')
         status_param = request.args.get('status')
         search_term = clean_string(request.args.get('search'))
@@ -186,10 +167,8 @@ def list_listings():
         page_param = request.args.get('page')
         offset_param = request.args.get('offset')
         sort_param = request.args.get('sort', 'created_desc')
-
         where_clauses = []
         params = []
-
         status_filter = None
         if status_param and status_param.lower() not in ('all', '*'):
             status_filter = _normalize_status(status_param)
@@ -198,12 +177,10 @@ def list_listings():
         if status_filter:
             where_clauses.append('l.status = %s')
             params.append(status_filter)
-
         if search_term:
             where_clauses.append('(l.title LIKE %s OR l.description LIKE %s)')
             like_term = f"%{search_term}%"
             params.extend([like_term, like_term])
-
         sort_map = {
             'title_asc': 'l.title ASC',
             'title_desc': 'l.title DESC',
@@ -213,7 +190,6 @@ def list_listings():
             'status': 'l.status ASC, l.created_at DESC',
         }
         order_clause = sort_map.get(sort_param, 'l.created_at DESC')
-
         limit_default = 25 if detailed else 100
         try:
             limit_value = int(limit_param) if limit_param is not None else limit_default

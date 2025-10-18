@@ -38,8 +38,6 @@
         </div>
         <div class="hero-actions" id="auction-session-cta"></div>
       </section>
-
-      <!-- Фільтри та оновлення -->
       <section class="dashboard-card dashboard-card--toolbar" aria-label="Панель фільтрів">
         <form id="auction-filters" class="auction-filters" autocomplete="off">
           <label class="auction-filters__field">
@@ -82,12 +80,11 @@
             <button type="button" class="btn btn-ghost btn-compact" id="auction-refresh-btn">Оновити</button>
           </div>
           <div class="auction-filters__meta">
-            <span id="auction-last-updated" class="muted">—</span>
+            <span id="auction-last-updated" class="muted">-</span>
             <span id="auction-refresh-countdown" class="countdown-badge" hidden></span>
           </div>
         </form>
       </section>
-
       <section class="dashboard-card dashboard-card--overview" id="auction-overview">
         <div class="section-heading">
           <span class="eyebrow">Огляд</span>
@@ -101,7 +98,6 @@
           <button type="button" data-filter-status="closed" class="pill-btn">Закрито</button>
         </div>
       </section>
-
       <section class="dashboard-card" id="collecting-card" aria-labelledby="collecting-heading">
         <div class="section-heading">
           <span class="eyebrow">Активні вікна</span>
@@ -110,7 +106,6 @@
         </div>
         <div class="stack-grid" id="collecting-list"></div>
       </section>
-
       <section class="dashboard-card" id="cleared-card" aria-labelledby="history-heading">
         <div class="section-heading">
           <span class="eyebrow">Історія</span>
@@ -119,10 +114,9 @@
         </div>
         <div class="stack-grid" id="cleared-list" aria-live="polite"></div>
         <div class="history-load-more" id="history-load-more-wrap" hidden>
-          <button type="button" id="history-load-more" class="btn btn-ghost btn-compact">Показати ще 30</button>
+          <button type="button" id="history-load-more" class="btn btn-ghost btn-compact">Показати ще...</button>
         </div>
       </section>
-
       <div class="visually-hidden" aria-live="polite" id="auctions-announcer"></div>
     </main>
     <script type="module" src="js/pages/auctions.js"></script>

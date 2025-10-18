@@ -3,6 +3,16 @@ import { applyRoleVisibility } from './session/visibility.js';
 import { createGuestSession } from './session/normalize.js';
 import { getCachedSession, clearCache } from './session/cache.js';
 
+function noBuggedControl() {
+    if (typeof document === 'undefined') return;
+    document.querySelectorAll('.site-header nav a').forEach((link) => {
+        const label = (link.textContent || '').trim().toLowerCase();
+        if (label === 'центр керування') {
+            link.remove();
+        }
+    });
+}
+
 export async function initAccessControl(options = {}) {
     const settings = {
         requireAuth: false,
@@ -19,6 +29,7 @@ export async function initAccessControl(options = {}) {
     } else {
         applyRoleVisibility(cached);
     }
+    noBuggedControl();
     let session;
     try {
         session = await resolveSession({ forceRefresh: settings.forceRefresh });
@@ -29,6 +40,7 @@ export async function initAccessControl(options = {}) {
         session = createGuestSession();
     }
     applyRoleVisibility(session);
+    noBuggedControl();
     const isAuthenticated = Boolean(session.authenticated);
     const isAdmin = Boolean(session.user?.is_admin);
     let denied = false;
@@ -67,5 +79,6 @@ export function clearCachedSession() {
     clearCache();
     if (typeof document !== 'undefined') {
         applyRoleVisibility(createGuestSession());
+        noBuggedControl();
     }
 }

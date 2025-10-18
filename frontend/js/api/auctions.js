@@ -12,7 +12,7 @@ export async function listAuctions({ status, type } = {}) {
 }
 
 export async function getAuctionBook(auctionId) {
-    const res = await fetch(resolveApiUrl(`/api/auctions/${auctionId}/book`));
+    const res = await authorizedFetch(`/api/auctions/${auctionId}/book`);
     if (!res.ok) throw new Error(`Не вдалося отримати книгу заявок аукціону: ${res.status}`);
     return res.json();
 }
@@ -45,6 +45,17 @@ export async function placeAuctionOrder(auctionId, { type, price, quantity }) {
     if (!res.ok) {
         const txt = await res.text();
         throw new Error(`Не вдалося розмістити ордер: ${res.status} ${txt}`);
+    }
+    return res.json();
+}
+
+export async function cancelAuctionOrder(auctionId, orderId) {
+    const res = await authorizedFetch(`/api/auctions/${auctionId}/orders/${orderId}`, {
+        method: 'DELETE'
+    });
+    if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`Не вдалося скасувати ордер: ${res.status} ${txt}`);
     }
     return res.json();
 }
@@ -85,11 +96,5 @@ export async function purgeAllBots(options = {}) {
         const txt = await res.text();
         throw new Error(`Не вдалося видалити всіх ботів: ${res.status} ${txt}`);
     }
-    return res.json();
-}
-
-export async function fetchPriceDistribution(auctionId) {
-    const res = await fetch(resolveApiUrl(`/api/auctions/${auctionId}/distribution`));
-    if (!res.ok) throw new Error(`Не вдалося отримати розподіл цін: ${res.status}`);
     return res.json();
 }

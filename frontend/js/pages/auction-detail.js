@@ -1,4 +1,4 @@
-import {getAuctionBook, getMe, joinAuction, myParticipationStatus, placeAuctionOrder,} from '../api.js';
+import {authorizedFetch, getAuctionBook, getMe, joinAuction, myParticipationStatus, placeAuctionOrder, cancelAuctionOrder, meAuctionOrders} from '../api.js';
 import { showToast } from '../ui/toast.js';
 import { initAccessControl } from '../ui/session.js';
 
@@ -14,13 +14,16 @@ const bidsBody = document.getElementById('book-bids');
 const asksBody = document.getElementById('book-asks');
 const metricsEl = document.getElementById('market-metrics');
 const formsEl = document.getElementById('market-forms');
+const refreshBtn = document.getElementById('refresh-book');
+const myOrdersListEl = document.getElementById('my-orders-list');
+const historyChartsEl = document.getElementById('history-charts');
+const priceDistEl = document.getElementById('price-distribution');
 const recentOrdersEl = document.getElementById('recent-orders');
 const recentClearingEl = document.getElementById('recent-clearing');
 const clearingChartEl = document.getElementById('clearing-chart');
-const refreshBtn = document.getElementById('refresh-book');
-// Optional container for history charts (add a <div id="auction-history-charts"></div> in HTML where desired)
-const historyChartsEl = document.getElementById('auction-history-charts');
-const priceDistEl = document.getElementById('price-distribution');
+const refreshDistBtn = document.getElementById('refresh-distribution');
+const tabsNavEl = document.querySelector('.market-tabs__nav');
+const tabsContainerEl = document.querySelector('.market-tabs');
 
 if (!auctionId) {
   summaryEl.innerHTML = '<p class="error">Невірний ідентифікатор аукціону</p>';
@@ -28,19 +31,22 @@ if (!auctionId) {
 }
 
 let isLoading = false;
-// Global refresh sequencing & throttling
-let __refreshSeq = 0;           // incremented for every logical refresh cycle
-let __lastHistoryAt = 0;        // last successful history fetch (ms)
-let __lastDistributionAt = 0;   // last successful distribution fetch (ms)
-const HISTORY_INTERVAL = 5000;  // ms
-const DIST_INTERVAL = 5000;     // ms
-const FULL_REFRESH_INTERVAL = 15000; // ms
+let __refreshSeq = 0;
+let __lastHistoryAt = 0;
+let __lastDistributionAt = 0;
+const HISTORY_INTERVAL = 3500;
+const DIST_INTERVAL = 3500;
+const FULL_REFRESH_INTERVAL = 12000;
 let __refreshTimer = null;
 let __pendingHistory = null;
 let __pendingDistribution = null;
-// Track active tab id
 let __activeTab = 'tab-book';
 let __refreshInFlight = false;
+
+function canViewAdminData() {
+  const me = window.__lastMe;
+  return Boolean(me?.authenticated && me.user?.is_admin);
+}
 
 function formatNumber(value, options = {}) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
@@ -48,9 +54,7 @@ function formatNumber(value, options = {}) {
   return Number(value).toLocaleString('uk-UA', { ...defaults, ...options });
 }
 
-// Prices: show 2 decimals to keep tick visibility; allow more if needed later
 function formatPrice(value) { return formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-// Quantity: 0–1 decimals (auto, use original rounding)
 function formatQty(value) { return formatNumber(value, { maximumFractionDigits: 1 }); }
 
 function formatDate(value) {
@@ -89,7 +93,7 @@ function localizeErrorMessage(msg) {
   return msg;
 }
 
-function renderSummary(book) {
+function renderSummary(book, me) {
   const { auction } = book;
   titleEl.textContent = `${auction.product}`;
   statusEl.textContent = tStatus(auction.status);
@@ -98,7 +102,7 @@ function renderSummary(book) {
 
   const meta = [];
   meta.push(`<span><strong>Тип:</strong> ${auction.type}</span>`);
-  meta.push(`<span><strong>k:</strong> ${formatNumber(auction.k_value, { maximumFractionDigits: 1 })}</span>`);
+  meta.push(`<span><strong>k:</strong> ${formatNumber(auction.k_value, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>`);
   if (auction.window_start) {
     meta.push(`<span><strong>Початок:</strong> ${formatDate(auction.window_start)}</span>`);
   }
@@ -110,6 +114,65 @@ function renderSummary(book) {
 
   const firstSymbol = auction.product?.trim()?.charAt(0)?.toUpperCase();
   thumbEl.innerHTML = firstSymbol ? `<span>${firstSymbol}</span>` : '<span>📦</span>';
+  const isCleared = auction.status === 'cleared' || auction.status === 'closed';
+  const isAdmin = me?.authenticated && me.user?.is_admin;
+  const shouldHideTabs = isCleared && !isAdmin;
+  const marketMainEl = document.querySelector('.market-main');
+  if (marketMainEl) {
+    if (shouldHideTabs) {
+      if (tabsNavEl) tabsNavEl.style.display = 'none';
+      if (tabsContainerEl) tabsContainerEl.style.display = 'none';
+      let noticeEl = marketMainEl.querySelector('.sealed-completion-notice');
+      if (!noticeEl) {
+        noticeEl = document.createElement('div');
+        noticeEl.className = 'card sealed-completion-notice';
+        noticeEl.innerHTML = `
+          <div class="sealed-notice" style="margin: 0;">
+            <p><strong>🔒 Sealed-bid аукціон завершено</strong></p>
+            <p style="margin-top: 12px; font-size: 0.9rem;">
+              Згідно з правилами sealed-bid (закритого) аукціону, книга заявок, розподіл цін
+              та активність приховані після завершення клірингу. Це забезпечує конфіденційність стратегій учасників.
+            </p>
+            <p style="margin-top: 12px; font-size: 0.9rem; color: var(--market-muted);">
+              Результати клірингу доступні тільки адміністраторам через спеціальні звіти.
+            </p>
+          </div>
+        `;
+        marketMainEl.insertBefore(noticeEl, marketMainEl.firstChild);
+      }
+      noticeEl.style.display = 'block';
+    } else {
+      if (tabsNavEl) tabsNavEl.style.display = '';
+      if (tabsContainerEl) tabsContainerEl.style.display = '';
+      const noticeEl = marketMainEl.querySelector('.sealed-completion-notice');
+      if (noticeEl) {
+        noticeEl.style.display = 'none';
+      }
+      if (isCleared && isAdmin) {
+        let adminNoticeEl = marketMainEl.querySelector('.admin-cleared-notice');
+        if (!adminNoticeEl) {
+          adminNoticeEl = document.createElement('div');
+          adminNoticeEl.className = 'card admin-cleared-notice';
+          adminNoticeEl.innerHTML = `
+            <div class="admin-notice" style="margin: 0;">
+              <p><strong>👤 Адмін режим: Аукціон завершено</strong></p>
+              <p style="margin-top: 8px; font-size: 0.9rem;">
+                Ви маєте доступ до всіх даних включно з історією клірингу, розподілом цін та активністю.
+                Ці дані приховані від звичайних учасників згідно з sealed-bid правилами.
+              </p>
+            </div>
+          `;
+          marketMainEl.insertBefore(adminNoticeEl, marketMainEl.firstChild);
+        }
+        adminNoticeEl.style.display = 'block';
+      } else {
+        const adminNoticeEl = marketMainEl.querySelector('.admin-cleared-notice');
+        if (adminNoticeEl) {
+          adminNoticeEl.style.display = 'none';
+        }
+      }
+    }
+  }
 
   actionsEl.innerHTML = '';
   const metrics = book.metrics;
@@ -130,12 +193,18 @@ function renderSummary(book) {
   }
 }
 
-function renderBook(book) {
+function renderBook(book, me) {
   bidsBody.innerHTML = '';
   asksBody.innerHTML = '';
-  // Use backend-provided aggregated levels (already grouped per exact price)
-  const bidLevels = (book.book.bids || []).slice(0, 15); // sorted desc by backend
-  const askLevels = (book.book.asks || []).slice(0, 15); // sorted asc by backend
+  const isAdmin = me?.authenticated && me.user?.is_admin;
+  const sealedView = book.visibility === 'sealed' && !isAdmin;
+  if (sealedView) {
+    bidsBody.innerHTML = '<tr><td colspan="5" class="muted">🔒 Книга заявок прихована (sealed-bid режим)</td></tr>';
+    asksBody.innerHTML = '<tr><td colspan="5" class="muted">🔒 Книга заявок прихована (sealed-bid режим)</td></tr>';
+    return;
+  }
+  const bidLevels = (book.book.bids || []).slice(0, 15);
+  const askLevels = (book.book.asks || []).slice(0, 15);
   const totalVolume = (book.metrics?.totalBidQuantity || 0) + (book.metrics?.totalAskQuantity || 0);
   const maxBidCum = Math.max(...bidLevels.map(l => l.cumulativeQuantity || 0), 0);
   const maxAskCum = Math.max(...askLevels.map(l => l.cumulativeQuantity || 0), 0);
@@ -168,14 +237,55 @@ function renderBook(book) {
     asksBody.append(tr);
   });
   if (!bidsBody.children.length) {
-    bidsBody.innerHTML = '<tr><td colspan="4" class="muted">Немає активних заявок</td></tr>';
+    bidsBody.innerHTML = '<tr><td colspan="5" class="muted">Немає активних заявок</td></tr>';
   }
   if (!asksBody.children.length) {
-    asksBody.innerHTML = '<tr><td colspan="4" class="muted">Немає активних заявок</td></tr>';
+    asksBody.innerHTML = '<tr><td colspan="5" class="muted">Немає активних заявок</td></tr>';
   }
 }
 
-function renderMetrics(book) {
+function renderMetrics(book, me) {
+  const auction = book.auction;
+  const isCleared = auction.status === 'cleared' || auction.status === 'closed';
+  const isAdmin = me?.authenticated && me.user?.is_admin;
+
+  if (book.visibility === 'sealed' && !isAdmin) {
+    if (isCleared) {
+      metricsEl.innerHTML = `
+        <div class="sealed-notice">
+          <p style="margin: 0 0 12px 0;">
+            <strong>🔒 Sealed-bid аукціон завершено</strong>
+          </p>
+          <dl>
+            <dt>k-параметр</dt>
+            <dd>${book.metrics?.kValue !== null && book.metrics?.kValue !== undefined ? formatNumber(book.metrics.kValue, {maximumFractionDigits: 3}) : '—'}</dd>
+            <dt>Фінальна clearing ціна</dt>
+            <dd>${book.metrics?.lastClearingPrice !== null && book.metrics?.lastClearingPrice !== undefined ? formatPrice(book.metrics.lastClearingPrice) : '—'}</dd>
+            <dt>Фінальна clearing кількість</dt>
+            <dd>${book.metrics?.lastClearingQuantity !== null && book.metrics?.lastClearingQuantity !== undefined ? formatQty(book.metrics.lastClearingQuantity) : '—'}</dd>
+          </dl>
+        </div>
+      `;
+    } else {
+      metricsEl.innerHTML = `
+        <div class="sealed-notice">
+          <p class="muted" style="margin: 0 0 12px 0;">
+            <strong>🔒 Sealed-bid режим</strong><br>
+            Метрики книги заявок недоступні до завершення клірингу.
+          </p>
+          <dl>
+            <dt>k-параметр</dt>
+            <dd>${book.metrics?.kValue !== null && book.metrics?.kValue !== undefined ? formatNumber(book.metrics.kValue, {maximumFractionDigits: 3}) : '—'}</dd>
+            <dt>Остання clearing ціна</dt>
+            <dd>${book.metrics?.lastClearingPrice !== null && book.metrics?.lastClearingPrice !== undefined ? formatPrice(book.metrics.lastClearingPrice) : '—'}</dd>
+            <dt>Остання clearing кількість</dt>
+            <dd>${book.metrics?.lastClearingQuantity !== null && book.metrics?.lastClearingQuantity !== undefined ? formatQty(book.metrics.lastClearingQuantity) : '—'}</dd>
+          </dl>
+        </div>
+      `;
+    }
+    return;
+  }
   const m = book.metrics;
   const h = window.__auctionMetricHistory || (window.__auctionMetricHistory = { spread:[], midPrice:[], depthImbalancePct:[], lastClearingPrice:[] });
   const push = (k,v)=>{ if (typeof v==='number' && isFinite(v)){ h[k].push(v); if (h[k].length>150) h[k].shift(); } };
@@ -199,31 +309,26 @@ function renderMetrics(book) {
   };
   metricsEl.innerHTML = '';
   const wrap = document.createElement('div'); wrap.className='metrics-tiles';
-  // Primary tiles
   const grid = document.createElement('div'); grid.className='metrics-tiles__grid';
   const tiles = [
     {k:'spread', label:'Спред', value:fmt(m.spread), spark:sparkBar(h.spread,{stroke:'#7ee787'}), cls:(m.spread<0?'negative':'positive')},
     {k:'mid', label:'Mid ціна', value:fmt(m.midPrice), spark:sparkBar(h.midPrice,{stroke:'#66c0f4'})},
     {k:'depthImb', label:'Дисбаланс', value:fmt(typeof m.depthImbalance==='number'?m.depthImbalance*100:NaN,{pct:true}), spark:sparkBar(h.depthImbalancePct,{stroke:'#ff9393'}), cls: (m.depthImbalance>0?'positive':'negative')},
-    {k:'lastClr', label:'Clearing ціна', value:fmt(m.lastClearingPrice), spark:sparkBar(h.lastClearingPrice,{stroke:'#cfa8ff'})},
-    {k:'ordersBid', label:'Ордерів bid', value:fmt(m.bidOrderCount)},
-    {k:'ordersAsk', label:'Ордерів ask', value:fmt(m.askOrderCount)}
+    {k:'lastClr', label:'Clearing ціна', value:fmt(m.lastClearingPrice), spark:sparkBar(h.lastClearingPrice,{stroke:'#cfa8ff'})}
   ];
   if (typeof m.kValue === 'number') {
-    tiles.push({k:'kVal', label:'k (база)', value:fmt(m.kValue,{})});
+    tiles.push({k:'kVal', label:'k-параметр', value:fmt(m.kValue,{maximumFractionDigits:3})});
   }
   if (typeof m.adaptiveK === 'number') {
     const diffCls = (m.kValue!==undefined && m.adaptiveK!==m.kValue)? 'positive' : '';
-    tiles.push({k:'kAdaptive', label:'k адаптив', value:fmt(m.adaptiveK,{}), cls: diffCls});
+    tiles.push({k:'kAdaptive', label:'k адаптив', value:fmt(m.adaptiveK,{maximumFractionDigits:3}), cls: diffCls});
   }
-  // Create standard tiles (except combined volume handled separately below)
   tiles.forEach(t=>{
     const div = document.createElement('div'); div.className='metric-tile'+(t.cls?(' '+t.cls):'');
     div.innerHTML = `<div class="metric-tile__label">${t.label}</div><div class="metric-tile__value">${t.value}</div>${t.spark?`<div class="metric-tile__spark">${t.spark}</div>`:''}`;
     grid.appendChild(div);
   });
 
-  // Combined Bid/Ask volume progress bar tile
   const bidVol = (typeof m.totalBidQuantity === 'number' ? m.totalBidQuantity : 0) || 0;
   const askVol = (typeof m.totalAskQuantity === 'number' ? m.totalAskQuantity : 0) || 0;
   const totVol = bidVol + askVol;
@@ -244,7 +349,6 @@ function renderMetrics(book) {
     </div>`;
   grid.appendChild(volTile);
   wrap.appendChild(grid);
-  // Toggle & extra metrics
   const toggle = document.createElement('button'); toggle.type='button'; toggle.className='metrics-more-toggle'; toggle.textContent='Додаткові метрики';
   const extra = document.createElement('div'); extra.className='metrics-extra hidden';
   const extraList = [
@@ -264,18 +368,28 @@ function renderMetrics(book) {
   metricsEl.appendChild(wrap);
 }
 
-// --------- History (price & depth) ---------
 async function fetchHistory(force=false, seqExpected) {
   if (!auctionId) return null;
+  if (!canViewAdminData()) {
+    if (historyChartsEl) {
+      historyChartsEl.innerHTML = '<div class="muted">Дані історії доступні лише адміністраторам.</div>';
+    }
+    return null;
+  }
   const now = Date.now();
   if (!force && (now - __lastHistoryAt < HISTORY_INTERVAL)) return null;
-  // Cancel previous (not via AbortController to keep simple) by overwriting promise ref
   const p = (async () => {
     try {
-      const r = await fetch(`/api/auctions/${auctionId}/history`);
+      const r = await authorizedFetch(`/api/auctions/${auctionId}/history`);
+      if (r.status === 403) {
+        if (historyChartsEl) {
+          historyChartsEl.innerHTML = '<div class="muted">Дані історії доступні лише адміністраторам.</div>';
+        }
+        return null;
+      }
       if (!r.ok) return null;
       const data = await r.json();
-      if (seqExpected && seqExpected < __refreshSeq) return null; // outdated
+      if (seqExpected && seqExpected < __refreshSeq) return null;
       __lastHistoryAt = Date.now();
       return data;
     } catch { return null; }
@@ -318,8 +432,12 @@ function buildDepth(curve, {w=340,h=110,midPrice=null}={}) {
 
 async function updateHistoryCharts(force=false, seqExpected) {
   if (!historyChartsEl) return;
+  if (!canViewAdminData()) {
+    historyChartsEl.innerHTML = '<div class="muted">Цей розділ доступний лише адміністраторам.</div>';
+    return;
+  }
   const data = await fetchHistory(force, seqExpected);
-  if (!data) return; // throttled or failed
+  if (!data) return;
   const prices = (data.clearedSeries||[]).filter(p=>typeof p.price==='number');
   const lastPrice = prices.length? prices[prices.length-1].price : null;
   const firstPrice = prices.length? prices[0].price : null;
@@ -350,16 +468,23 @@ async function updateHistoryCharts(force=false, seqExpected) {
     </div>`;
 }
 
-// --------- Price distribution (Steam-like depth bars) ---------
 async function updatePriceDistribution(force=false, seqExpected) {
   if (!priceDistEl) return;
+  if (!canViewAdminData()) {
+    priceDistEl.innerHTML = '<div class="muted">Розподіл цін доступний лише адміністраторам.</div>';
+    return;
+  }
   const now = Date.now();
-  if (!force && (now - __lastDistributionAt < DIST_INTERVAL)) return; // throttle
+  if (!force && (now - __lastDistributionAt < DIST_INTERVAL)) return;
   try {
-    const res = await fetch(`/api/auctions/${auctionId}/distribution`);
+    const res = await authorizedFetch(`/api/auctions/${auctionId}/distribution`);
+    if (res.status === 403) {
+      priceDistEl.innerHTML = '<div class="muted">Розподіл цін доступний лише адміністраторам.</div>';
+      return;
+    }
     if (!res.ok) return;
     const dist = await res.json();
-    if (seqExpected && seqExpected < __refreshSeq) return; // outdated response
+    if (seqExpected && seqExpected < __refreshSeq) return;
     __lastDistributionAt = Date.now();
     const { bids=[], asks=[], mid } = dist;
     const maxQty = Math.max(...bids.map(b=>b.qty), ...asks.map(a=>a.qty), 1);
@@ -471,15 +596,44 @@ function renderForms(book, me, participation) {
   formsEl.innerHTML = '';
   const auction = book.auction;
   const isTrader = me?.authenticated && !me.user?.is_admin;
-  if (!isTrader) {
-    formsEl.innerHTML = '<p class="muted">Увійдіть як трейдер, щоб подавати заявки.</p>';
+  const isAdmin = me?.authenticated && me.user?.is_admin;
+  
+  const isCleared = auction.status === 'cleared' || auction.status === 'closed';
+  if (isCleared) {
+    formsEl.innerHTML = `
+      <div class="sealed-notice">
+        <p><strong>🔒 Аукціон завершено</strong></p>
+        <p style="margin-top: 8px; font-size: 0.9rem;">
+          Подача нових заявок неможлива після завершення клірингу.
+        </p>
+      </div>
+    `;
     return;
   }
+  
+  if (!me?.authenticated) {
+    formsEl.innerHTML = '<p class="muted">Увійдіть, щоб взяти участь в аукціоні.</p>';
+    return;
+  }
+  
+  if (isAdmin) {
+    formsEl.innerHTML = `
+      <div class="admin-notice">
+        <p class="muted"><strong>👤 Адмін режим</strong></p>
+        <p class="muted" style="font-size: 0.85rem; margin-top: 8px;">
+          Ви увійшли як адміністратор. Подача заявок доступна тільки для трейдерів.
+        </p>
+      </div>
+    `;
+    return;
+  }
+  
   const joinStatus = participation?.status || null;
   const statusLabel = document.createElement('div');
-  statusLabel.innerHTML = `<strong>Статус участі:</strong> ${joinStatus || 'не приєднався'}`;
+  statusLabel.className = 'participation-status';
+  statusLabel.innerHTML = `<strong>Статус участі:</strong> <span class="status-badge status-${joinStatus || 'none'}">${joinStatus || 'не приєднався'}</span>`;
   if (participation?.account_id) {
-    statusLabel.innerHTML += `<span class="muted"> · accountId ${participation.account_id}</span>`;
+    statusLabel.innerHTML += `<span class="muted" style="display: block; margin-top: 4px; font-size: 0.85rem;">Рахунок: ${participation.account_id}</span>`;
   }
   formsEl.append(statusLabel);
 
@@ -489,7 +643,6 @@ function renderForms(book, me, participation) {
     note.textContent = 'Відкритий аукціон — приєднання не потрібне, можна одразу подавати заявки.';
     formsEl.append(note);
   }
-
   if (auction.status === 'collecting' && auction.type === 'closed' && joinStatus !== 'approved') {
     if (joinStatus === 'pending') {
       const note = document.createElement('p');
@@ -534,26 +687,32 @@ function renderForms(book, me, participation) {
   }
 
   const orderForm = document.createElement('form');
+  orderForm.className = 'order-form';
   orderForm.innerHTML = `
-    <label for="order-side">Тип ордеру</label>
-    <select id="order-side" name="side">
-      <option value="bid">Купити</option>
-      <option value="ask">Продати</option>
+    <h4 style="margin: 12px 0 8px 0; font-size: 0.95rem;">Подати заявку</h4>
+    <label for="order-side">Тип заявки</label>
+    <select id="order-side" name="side" required>
+      <option value="bid">📈 Bid (купівля)</option>
+      <option value="ask">📉 Ask (продаж)</option>
     </select>
     <div class="market-form__split">
       <label>
         Ціна
-        <input name="price" type="number" min="0" step="0.000001" required />
+        <input name="price" type="number" min="0" step="0.1" placeholder="0.0" required />
       </label>
       <label>
         Кількість
-        <input name="quantity" type="number" min="0" step="0.000001" required />
+        <input name="quantity" type="number" min="0" step="0.1" placeholder="0.0" required />
       </label>
     </div>
-    <button type="submit" class="btn">Подати ордер</button>
+    <button type="submit" class="btn btn-primary">Подати заявку</button>
   `;
   orderForm.addEventListener('submit', async (event) => {
     event.preventDefault();
+    const submitBtn = orderForm.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Обробка...';
     const formData = new FormData(orderForm);
     const payload = {
       type: formData.get('side'),
@@ -561,12 +720,18 @@ function renderForms(book, me, participation) {
       quantity: Number(formData.get('quantity')),
     };
     try {
+      if (payload.price <= 0 || payload.quantity <= 0) {
+        throw new Error('Ціна та кількість повинні бути більше нуля');
+      }
       await placeAuctionOrder(auctionId, payload);
-      showToast('Ордер прийнято', 'success');
+      showToast('✅ Заявку прийнято', 'success');
       orderForm.reset();
       await load();
     } catch (error) {
-  showToast(localizeErrorMessage(error?.message || 'Не вдалося подати ордер'), 'error');
+      showToast(localizeErrorMessage(error?.message || 'Не вдалося подати заявку'), 'error');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalText;
     }
   });
   formsEl.append(orderForm);
@@ -582,19 +747,18 @@ async function load(seq) {
       getMe().catch(() => ({ authenticated: false })),
       getAuctionBook(auctionId),
     ]);
-    if (currentSeq < __refreshSeq) return; // outdated; skip apply
+    if (currentSeq < __refreshSeq) return;
     let participation = null;
     if (me?.authenticated && !me.user?.is_admin) {
       participation = await myParticipationStatus(auctionId).catch(() => null);
     }
-    renderSummary(book);
-    renderBook(book);
-    renderMetrics(book);
-    renderOrdersList(book);
-    renderClearing(book);
+    renderSummary(book, me);
+    renderBook(book, me);
+    renderMetrics(book, me);
+    await renderMyOrdersTab(me);
     renderForms(book, me, participation);
     window.__lastBook = book;
-    // Auto-stop refresh if auction not collecting
+    window.__lastMe = me;
     if (book?.auction?.status && book.auction.status !== 'collecting') {
       if (__refreshTimer) { clearInterval(__refreshTimer); __refreshTimer = null; }
     }
@@ -610,29 +774,81 @@ async function load(seq) {
   return currentSeq;
 }
 
-// Unified refresh orchestrator
-async function refreshAll({forceHistory=false, forceDistribution=false}={}) {
-  if (__refreshInFlight) return; // drop if still processing (UI will catch up next interval)
+async function refreshAll() {
+  if (__refreshInFlight) return;
   __refreshInFlight = true;
   const seq = ++__refreshSeq;
-  // Always refresh book first (may update metrics used by others)
   await load(seq);
-  // Only run heavier tasks if relevant tab visible or forced
-  if (__activeTab === 'tab-distribution' || forceHistory) {
-    updateHistoryCharts(forceHistory, seq);
-    updatePriceDistribution(forceDistribution || forceHistory, seq);
-  } else if (__activeTab === 'tab-book') {
-    // still update history occasionally (background) without force
-    updateHistoryCharts(false, seq);
+  if (__activeTab === 'tab-activity') {
+    await updateHistoryCharts(false, seq);
+    if (window.__lastBook) {
+      try { renderOrdersList(window.__lastBook); } catch {}
+      try { renderClearing(window.__lastBook); } catch {}
+    }
+  } else if (__activeTab === 'tab-distribution') {
+    await updatePriceDistribution(false, seq);
   }
   __refreshInFlight = false;
 }
 
-refreshBtn.addEventListener('click', () => { refreshAll({forceHistory:true, forceDistribution:true}).then(()=> showToast('Оновлено', 'info')); });
+async function renderMyOrdersTab(me) {
+  if (!myOrdersListEl) return;
+  myOrdersListEl.innerHTML = '';
+  if (!me?.authenticated || me.user?.is_admin) {
+    myOrdersListEl.innerHTML = '<div class="muted">Доступно лише трейдерам</div>';
+    return;
+  }
+  let rows = [];
+  try {
+    rows = await meAuctionOrders();
+  } catch (_) {
+    myOrdersListEl.innerHTML = '<div class="muted">Не вдалося завантажити</div>';
+    return;
+  }
+  const ours = rows.filter((o) => Number(o.auction_id) === Number(auctionId));
+  if (!ours.length) {
+    myOrdersListEl.innerHTML = '<div class="muted">Ще немає ордерів</div>';
+    return;
+  }
+  const list = document.createElement('ul');
+  list.className = 'market-activity__list';
+  ours.forEach((o) => {
+    const li = document.createElement('li');
+    const qty = Number(o.quantity);
+    const createdAt = o.created_at ? new Date(o.created_at).toLocaleString() : '';
+    li.innerHTML = `
+      <div><strong>${tSide(o.side)}</strong> ${formatQty(qty)} @ ${formatPrice(o.price)} ${o.status ? `<span class="pill">${o.status}</span>` : ''}</div>
+      <span>${createdAt}</span>
+    `;
+    if (o.status === 'open') {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-ghost btn-compact';
+      btn.textContent = 'Скасувати';
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          await cancelAuctionOrder(auctionId, o.id);
+          showToast('Ордер скасовано', 'success');
+          await load();
+          await renderMyOrdersTab(me);
+        } catch (e) {
+          showToast(localizeErrorMessage(e?.message), 'error');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+      li.appendChild(btn);
+    }
+    list.appendChild(li);
+  });
+  myOrdersListEl.appendChild(list);
+}
+
+refreshBtn.addEventListener('click', () => { refreshAll().then(()=> showToast('Оновлено', 'info')); });
 
 document.addEventListener('DOMContentLoaded', async () => {
   await initAccessControl();
-  await refreshAll({forceHistory:true, forceDistribution:true});
+  await refreshAll();
   if (!__refreshTimer) {
     __refreshTimer = setInterval(() => {
       if (document.hidden) return;
@@ -647,7 +863,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Tabs logic
   const tabButtons = document.querySelectorAll('.tab-btn');
   const panels = document.querySelectorAll('.tab-panel');
   tabButtons.forEach(btn => {
@@ -660,9 +875,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       const panel = document.getElementById(id);
       if (panel) panel.classList.add('is-active');
       __activeTab = id;
+      if (id === 'tab-my-orders') { renderMyOrdersTab(window.__lastMe); }
+      if (id === 'tab-activity') {
+        updateHistoryCharts(true, __refreshSeq);
+        if (window.__lastBook) {
+          try { renderOrdersList(window.__lastBook); } catch {}
+          try { renderClearing(window.__lastBook); } catch {}
+        }
+      }
       if (id === 'tab-distribution') {
-        refreshAll({forceHistory:true, forceDistribution:true});
+        updatePriceDistribution(true, __refreshSeq);
       }
     });
   });
+
+  if (refreshDistBtn) {
+    refreshDistBtn.addEventListener('click', () => {
+      updatePriceDistribution(true, __refreshSeq).then(()=> showToast('Оновлено', 'info'));
+    });
+  }
 });

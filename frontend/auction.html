@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Книга ордерів аукціону</title>
-    <!-- Base + aggregated styles -->
     <link rel="stylesheet" href="css/backgroundstyle.css" />
     <link rel="stylesheet" href="css/style.css" />
   </head>
@@ -13,7 +12,7 @@
       <div class="logo">
         <div class="title-wrap">
           <h1 class="site-title">Аукціонний дім</h1>
-          <span class="site-description">Подвійний аукціон — книга заявок</span>
+          <span class="site-description">Подвійний аукціон - книга заявок</span>
         </div>
       </div>
       <nav>
@@ -29,7 +28,6 @@
       </nav>
     </header>
     <main class="market-container">
-      <!-- Summary (required by JS) -->
       <section id="market-summary" class="market-summary card">
         <div class="market-summary__image" id="market-thumbnail" aria-hidden="true"><span>📦</span></div>
         <div class="market-summary__info">
@@ -41,14 +39,13 @@
           <div class="market-summary__actions" id="market-actions"></div>
         </div>
       </section>
-
-      <!-- New responsive layout with tabs + sticky sidebar -->
       <section class="market-layout">
         <div class="market-main">
           <nav class="market-tabs__nav" aria-label="Навігація панелей">
             <button type="button" class="tab-btn is-active" data-tab-target="tab-book">Книга</button>
-            <button type="button" class="tab-btn" data-tab-target="tab-distribution">Розподіл</button>
-            <button type="button" class="tab-btn" data-tab-target="tab-activity">Активність</button>
+            <button type="button" class="tab-btn" data-tab-target="tab-my-orders">Мої ордери</button>
+            <button type="button" class="tab-btn" data-role-required="admin" data-tab-target="tab-distribution">Розподіл</button>
+            <button type="button" class="tab-btn" data-role-required="admin" data-tab-target="tab-activity">Активність</button>
           </nav>
           <div class="market-tabs">
             <div id="tab-book" class="tab-panel is-active">
@@ -93,29 +90,43 @@
                 </div>
               </article>
             </div>
-            <div id="tab-distribution" class="tab-panel">
+            <div id="tab-my-orders" class="tab-panel">
               <article class="card market-panel market-panel--compact">
                 <header class="market-panel__header">
-                  <h3>Розподіл & Історія</h3>
+                  <h3>Мої ордери</h3>
                 </header>
-                <div id="auction-history-charts" class="chart-block"></div>
-                <div id="price-distribution" class="chart-block"></div>
+                <div id="my-orders-list" class="market-activity__list"></div>
               </article>
             </div>
-            <div id="tab-activity" class="tab-panel">
+            <div id="tab-distribution" class="tab-panel" data-role-required="admin">
               <article class="card market-panel market-panel--compact">
                 <header class="market-panel__header">
-                  <h3>Останні дії</h3>
+                  <h3>Розподіл цін</h3>
+                  <div class="panel-actions">
+                    <button class="btn btn-ghost btn-compact" id="refresh-distribution">Оновити</button>
+                  </div>
+                </header>
+                <div id="price-distribution" class="price-distribution"></div>
+              </article>
+            </div>
+            <div id="tab-activity" class="tab-panel" data-role-required="admin">
+              <article class="card market-panel market-panel--compact">
+                <header class="market-panel__header">
+                  <h3>Активність</h3>
                 </header>
                 <div class="market-activity">
-                  <div>
-                    <h4>Нові заявки</h4>
+                  <div class="market-activity__section">
+                    <h4>Історія клірингу та глибина</h4>
+                    <div id="history-charts" class="history-charts"></div>
+                  </div>
+                  <div class="market-activity__section">
+                    <h4>Останні ордери</h4>
                     <ul id="recent-orders" class="market-activity__list"></ul>
                   </div>
-                  <div>
-                    <h4>Кліринг</h4>
-                    <div id="clearing-chart" class="market-chart" aria-hidden="true"></div>
-                    <ul id="recent-clearing" class="market-activity__list"></ul>
+                  <div class="market-activity__section">
+                    <h4>Clearing ціни</h4>
+                    <div id="clearing-chart" class="market-chart"></div>
+                    <ul id="recent-clearing" class="market-activity__list" style="margin-top:12px;"></ul>
                   </div>
                 </div>
               </article>
@@ -132,7 +143,9 @@
       </section>
     </main>
     <footer class="site-footer-main">
-      <div class="footer-content"><p>&copy; 2025 Аукціонний дім. Усі права захищені.</p></div>
+      <div class="footer-content">
+        <p>&copy; 2025 Аукціонний дім. Усі права захищені.</p>
+      </div>
     </footer>
     <script type="module" src="js/pages/auction-detail.js"></script>
   </body>

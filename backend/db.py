@@ -5,7 +5,6 @@ import datetime
 from .config import DB_CONFIG
 from .errors import DBError
 
-
 def db_connection():
     try:
         connection = connect(**DB_CONFIG)
@@ -14,7 +13,6 @@ def db_connection():
         raise DBError("Database connection failed")
     except Error as exception:
         raise DBError("Database connection failed", details=str(exception))
-
 
 def ensure_users_table(connection):
     cursor = connection.cursor()
@@ -77,6 +75,23 @@ def ensure_user_profiles(connection):
                 pass
         try:
             cur.execute("ALTER TABLE admins_profile ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+        except Exception:
+            pass
+        connection.commit()
+    finally:
+        cur.close()
+
+def try_add_owner_columns(connection):
+    cur = connection.cursor()
+    try:
+        try:
+            cur.execute("ALTER TABLE listings ADD COLUMN owner_id INT NULL")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_listings_owner ON listings(owner_id)")
+        except Exception:
+            pass
+        try:
+            cur.execute("ALTER TABLE orders ADD COLUMN creator_id INT NULL")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_orders_creator ON orders(creator_id)")
         except Exception:
             pass
         connection.commit()
@@ -266,7 +281,6 @@ def ensure_auctions_tables(connection):
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """
         )
-        # Ensure legacy deployments receive newly required columns/indexes
         for column_def in [
             ("iteration", "INT NULL"),
             ("reserved_amount", "DECIMAL(18,6) NULL"),
@@ -284,6 +298,25 @@ def ensure_auctions_tables(connection):
                 cur.execute(index_def)
             except Exception:
                 pass
+        connection.commit()
+    finally:
+        cur.close()
+
+def ensure_trader_inventory(connection):
+    cur = connection.cursor()
+    try:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS trader_inventory (
+                trader_id INT NOT NULL,
+                product VARCHAR(255) NOT NULL,
+                quantity DECIMAL(18,6) NOT NULL DEFAULT 0,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (trader_id, product),
+                FOREIGN KEY (trader_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """
+        )
         connection.commit()
     finally:
         cur.close()
@@ -364,33 +397,16 @@ def ensure_wallet_tables(connection):
     finally:
         cur.close()
 
-__all__ = [
-    'db_connection',
+__all__ = ['db_connection',
     'ensure_users_table',
     'ensure_user_profiles',
     'ensure_listings_table',
     'ensure_orders_table',
     'ensure_trades_table',
     'ensure_auctions_tables',
+    'ensure_trader_inventory',
     'ensure_resource_transactions',
     'ensure_resource_documents',
     'ensure_wallet_tables',
     'try_add_owner_columns',
 ]
-
-def try_add_owner_columns(connection):
-    cur = connection.cursor()
-    try:
-        try:
-            cur.execute("ALTER TABLE listings ADD COLUMN owner_id INT NULL")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_listings_owner ON listings(owner_id)")
-        except Exception:
-            pass
-        try:
-            cur.execute("ALTER TABLE orders ADD COLUMN creator_id INT NULL")
-            cur.execute("CREATE INDEX IF NOT EXISTS idx_orders_creator ON orders(creator_id)")
-        except Exception:
-            pass
-        connection.commit()
-    finally:
-        cur.close()

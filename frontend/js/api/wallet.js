@@ -6,6 +6,14 @@ export async function getWalletBalance() {
     return res.json();
 }
 
+export async function walletTransactions(limit = 50) {
+    const params = new URLSearchParams();
+    if (limit) params.set('limit', String(limit));
+    const res = await authorizedFetch(`/api/me/wallet/transactions?${params.toString()}`);
+    if (!res.ok) throw new Error(`Транзакції гаманця не вдалися: ${res.status}`);
+    return res.json();
+}
+
 export async function walletDeposit(amount) {
     const res = await authorizedFetch('/api/me/wallet/deposit', {
         method: 'POST',
@@ -29,13 +37,5 @@ export async function walletWithdraw(amount) {
         const txt = await res.text();
         throw new Error(`Виведення не вдалося: ${res.status} ${txt}`);
     }
-    return res.json();
-}
-
-export async function walletTransactions(limit = 50) {
-    const params = new URLSearchParams();
-    if (limit) params.set('limit', String(limit));
-    const res = await authorizedFetch(`/api/me/wallet/transactions?${params.toString()}`);
-    if (!res.ok) throw new Error(`Транзакції гаманця не вдалися: ${res.status}`);
     return res.json();
 }

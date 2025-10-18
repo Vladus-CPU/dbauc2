@@ -29,29 +29,20 @@ def register():
         if cur.fetchone():
             return jsonify({"error": "Username already exists"}), 409
         pwd_hash = bcrypt.hash(password)
-        cur.close()
-        cur = conn.cursor()
         cur.execute(
             "INSERT INTO users (username, email, password_hash, is_admin) VALUES (%s, %s, %s, %s)",
             (username, email, pwd_hash, 0)
         )
         user_id = cur.lastrowid
-        cur.close()
-        cur = conn.cursor()
         cur.execute(
             "INSERT INTO traders_profile (user_id, first_name, last_name, city, region, country) "
-            "VALUES (%s,%s,%s,%s,%s,%s)"
-            " ON DUPLICATE KEY UPDATE first_name=VALUES(first_name), last_name=VALUES(last_name), "
-            "city=VALUES(city), region=VALUES(region), country=VALUES(country)",
+            "VALUES (%s, %s, %s, %s, %s, %s)",
             (user_id, first_name, last_name, city, region, country)
         )
         conn.commit()
         return jsonify({"message": "Registered"}), 201
     except Exception as e:
-        try:
-            conn.rollback()
-        except Exception:
-            pass
+        conn.rollback()
         raise DBError("Error registering user", details=str(e))
     finally:
         cur.close()

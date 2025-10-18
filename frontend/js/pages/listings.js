@@ -101,7 +101,6 @@ const els = {
     listingIdInput: document.getElementById('listing-id'),
 };
 
-// Global action locker to avoid overlapping network mutations
 const withLock = createLocker();
 
 function formatCurrency(value) {
@@ -126,8 +125,6 @@ function formatDateTime(value) {
         return String(value);
     }
 }
-
-// (Using shared debounce from asyncUtils.js)
 
 function setTableLoading(isLoading) {
     if (!els.tableBody) return;
@@ -159,7 +156,6 @@ function renderTable() {
             tr.classList.add('is-selected');
         }
 
-        // Title column
         const titleTd = document.createElement('td');
         const titleWrap = document.createElement('div');
         titleWrap.className = 'inventory-title';
@@ -185,21 +181,18 @@ function renderTable() {
         titleWrap.appendChild(meta);
         titleTd.appendChild(titleWrap);
 
-        // Price column
         const priceTd = document.createElement('td');
         priceTd.innerHTML = `
             <div>Старт: <strong>${formatCurrency(item.startingBid)}</strong></div>
             <div>Поточна: <strong>${formatCurrency(item.currentBid)}</strong></div>
         `;
 
-        // Quantity column
         const qtyTd = document.createElement('td');
         const baseLines = [];
         baseLines.push(`<div>Одиниця: <strong>${item.unit || '—'}</strong></div>`);
         baseLines.push(`<div>База: <strong>${formatQuantity(item.baseQuantity)}</strong></div>`);
         qtyTd.innerHTML = baseLines.join('');
 
-        // Auctions column
         const auctionsTd = document.createElement('td');
         const countLine = document.createElement('div');
         countLine.textContent = `К-сть: ${item.auctionCount || 0}`;
@@ -224,15 +217,12 @@ function renderTable() {
             auctionsTd.appendChild(noneLine);
         }
 
-        // Actions column
         const actionsTd = document.createElement('td');
         const actionsWrap = document.createElement('div');
         actionsWrap.className = 'inventory-actions';
 
-        // Determine next status action config
         const statusConfig = nextStatusConfig[item.status] || nextStatusConfig.draft;
 
-        // Edit button (explicit edit action)
         const editBtn = document.createElement('button');
         editBtn.type = 'button';
         editBtn.dataset.action = 'edit';
@@ -240,7 +230,6 @@ function renderTable() {
         editBtn.textContent = 'Редагувати';
         actionsWrap.appendChild(editBtn);
 
-        // Status change button
         const statusBtn = document.createElement('button');
         statusBtn.type = 'button';
         statusBtn.dataset.action = 'status';
@@ -249,7 +238,6 @@ function renderTable() {
         statusBtn.textContent = statusConfig.label;
         actionsWrap.appendChild(statusBtn);
 
-        // Delete button
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
         deleteBtn.dataset.action = 'delete';
@@ -362,7 +350,7 @@ async function refreshInventorySummary() {
     try {
         const summary = await getListingSummary(params);
         if (requestId !== summaryRequestId) {
-            return; // stale response
+            return;
         }
         applyInventorySummary(summary);
     } catch (error) {
@@ -508,11 +496,6 @@ async function loadListings({ preserveSelection = true } = {}) {
         state.items = Array.isArray(result.items) ? result.items : Array.isArray(result) ? result : [];
         state.total = typeof result.total === 'number' ? result.total : state.items.length;
 
-        // --- Extra merge: include auctions created поза сторінкою listing.html ---
-        // Rationale: адміністратор може створити аукціон через admin панель (createAuction)
-        // без прямого зв'язку із listingId. Ми намагаємось прив'язати такі аукціони
-        // до лоту за збігом назви (title == product) без врахування регістру та пробілів.
-        // Обмеження: можливі колізії якщо різні лоти мають однакову назву.
         try {
             const allAuctions = await listAuctions().catch(() => []);
             const norm = (s) => (s || '').toString().trim().toLowerCase();
@@ -522,12 +505,11 @@ async function loadListings({ preserveSelection = true } = {}) {
                 if (!auctionsByProduct.has(key)) auctionsByProduct.set(key, []);
                 auctionsByProduct.get(key).push(a);
             }
-            // Sort each bucket by created_at/window_start (newest first)
             for (const bucket of auctionsByProduct.values()) {
                 bucket.sort((a,b)=>{
                     const da = new Date(a.window_start || a.created_at || 0).getTime();
                     const db = new Date(b.window_start || b.created_at || 0).getTime();
-                    return db - da; // descending
+                    return db - da;
                 });
             }
             state.items = state.items.map(item => {
@@ -537,9 +519,7 @@ async function loadListings({ preserveSelection = true } = {}) {
                 const extCount = bucket.length;
                 const newest = bucket[0];
                 const currentCount = Number(item.auctionCount || 0);
-                // If existing count already >= external count we assume backend already linked.
                 const mergedCount = currentCount >= extCount ? currentCount : extCount;
-                // Decide last auction: pick the most recent between item.lastAuction and newest external
                 let lastAuction = item.lastAuction || null;
                 const lastTime = lastAuction ? new Date(lastAuction.createdAt || lastAuction.window_start || 0).getTime() : 0;
                 const newestTime = new Date(newest.window_start || newest.created_at || 0).getTime();

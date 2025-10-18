@@ -1,15 +1,12 @@
 import os
 import sys
 from importlib import import_module
-
 from flask import Flask
 from flask_cors import CORS
-
 if __name__ == "__main__" and __package__ is None:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     __package__ = "backend"
 _PACKAGE_ROOT = __package__.split(".")[0]
-
 
 def _load_blueprints():
     blueprint_specs = [
@@ -30,7 +27,6 @@ def _load_blueprints():
         blueprints.append(getattr(module, attr))
     return blueprints
 
-
 def _ensure_directories(app: Flask) -> None:
     resource_docs = os.path.join(app.root_path, "resource_docs")
     generated_docs = os.path.join(app.root_path, "generated_docs")
@@ -39,9 +35,7 @@ def _ensure_directories(app: Flask) -> None:
     app.config.setdefault("RESOURCE_DOCS_ROOT", resource_docs)
     app.config.setdefault("GENERATED_DOCS_ROOT", generated_docs)
 
-
 from .errors import RegisterErrorRoutes
-
 
 def create_app() -> Flask:
     app = Flask(__name__)
@@ -51,7 +45,6 @@ def create_app() -> Flask:
     for blueprint in _load_blueprints():
         app.register_blueprint(blueprint)
     return app
-
 
 app = create_app()
 if __name__ == "__main__":

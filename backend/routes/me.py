@@ -3,6 +3,7 @@ from flask import Blueprint, current_app, jsonify, request, send_from_directory
 from ..db import (
     db_connection,
     ensure_auctions_tables,
+    ensure_trader_inventory,
     ensure_user_profiles,
     ensure_users_table,
 )
@@ -132,6 +133,25 @@ def me_auction_orders():
             WHERE o.trader_id = %s
             ORDER BY o.created_at DESC
             """,
+            (user['id'],)
+        )
+        return jsonify(serialize(cur.fetchall()))
+    finally:
+        cur.close()
+        conn.close()
+
+@me_bp.get('/inventory')
+def me_inventory():
+    conn = db_connection()
+    cur = conn.cursor(dictionary=True)
+    try:
+        ensure_users_table(conn)
+        ensure_trader_inventory(conn)
+        user = get_auth_user(conn)
+        if not user:
+            raise AppError("Unauthorized", statuscode=401)
+        cur.execute(
+            "SELECT product, quantity, updated_at FROM trader_inventory WHERE trader_id=%s ORDER BY updated_at DESC",
             (user['id'],)
         )
         return jsonify(serialize(cur.fetchall()))
