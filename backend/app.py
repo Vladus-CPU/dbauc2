@@ -16,7 +16,7 @@ def _load_blueprints():
         ("orders", "orders_bp"),
         ("accounts", "accounts_bp"),
         ("resources", "resources_bp"),
-        ("auctions", "auctions_bp"),
+        ("aucmodel", "auctions_bp"),
         ("me", "me_bp"),
         ("admin", "admin_bp"),
         ("wallet", "wallet_bp"),

@@ -1276,3 +1276,5 @@ def auction_price_distribution(auction_id: int):
         except Exception:
             pass
         conn.close()
+
+__all__ = ["auctions_bp"]
