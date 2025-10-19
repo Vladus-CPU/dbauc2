@@ -13,8 +13,8 @@ def db_connection():
         if "Unknown database" in str(e):
             base_config = {}
             for k, v in DB_CONFIG.items():
-            if k != "database":
-                base_config[k] = v
+                if k != "database":
+                    base_config[k] = v
             base_conn = connect(**base_config)
             cur = base_conn.cursor()
             cur.execute(f"CREATE DATABASE {DB_CONFIG['database']}")
