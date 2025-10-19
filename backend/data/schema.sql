@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS auction_orders (
   reserve_tx_id INT NULL,
   INDEX idx_ao_auction (auction_id),
   INDEX idx_ao_auction_status (auction_id, status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS trader_inventory (
   trader_id INT NOT NULL,
@@ -132,7 +132,7 @@ CREATE TABLE IF NOT EXISTS trader_inventory (
   quantity DECIMAL(18,6) NOT NULL DEFAULT 0,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (trader_id, product)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS resource_transactions (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -143,7 +143,7 @@ CREATE TABLE IF NOT EXISTS resource_transactions (
   notes TEXT NULL,
   INDEX idx_res_trader (trader_id),
   INDEX idx_res_type (type)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS resource_documents (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -153,14 +153,14 @@ CREATE TABLE IF NOT EXISTS resource_documents (
   uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   notes TEXT NULL,
   INDEX idx_resource_docs_trader (trader_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS wallet_accounts (
   user_id INT PRIMARY KEY,
   available DECIMAL(18,6) NOT NULL DEFAULT 0,
   reserved DECIMAL(18,6) NOT NULL DEFAULT 0,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS wallet_transactions (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -172,4 +172,4 @@ CREATE TABLE IF NOT EXISTS wallet_transactions (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_wallet_user (user_id),
   INDEX idx_wallet_created (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;

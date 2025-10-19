@@ -8,11 +8,22 @@ from .errors import DBError
 def db_connection():
     try:
         connection = connect(**DB_CONFIG)
-        if connection.is_connected():
+        return connection
+    except Error as e:
+        if "Unknown database" in str(e):
+            base_config = {}
+            for k, v in DB_CONFIG.items():
+            if k != "database":
+                base_config[k] = v
+            base_conn = connect(**base_config)
+            cur = base_conn.cursor()
+            cur.execute(f"CREATE DATABASE {DB_CONFIG['database']}")
+            base_conn.commit()
+            cur.close()
+            base_conn.close()
+            connection = connect(**DB_CONFIG)
             return connection
-        raise DBError("Database connection failed")
-    except Error as exception:
-        raise DBError("Database connection failed", details=str(exception))
+        raise DBError("Connection failed", details=str(e)) from e
 
 def ensure_users_table(connection):
     cursor = connection.cursor()
@@ -278,7 +289,7 @@ def ensure_auctions_tables(connection):
                 INDEX idx_ao_auction (auction_id),
                 INDEX idx_ao_auction_status (auction_id, status),
                 FOREIGN KEY (auction_id) REFERENCES auctions(id) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
             """
         )
         for column_def in [
@@ -314,7 +325,7 @@ def ensure_trader_inventory(connection):
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 PRIMARY KEY (trader_id, product),
                 FOREIGN KEY (trader_id) REFERENCES users(id) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
             """
         )
         connection.commit()
@@ -335,7 +346,7 @@ def ensure_resource_transactions(connection):
                 notes TEXT NULL,
                 INDEX idx_res_trader (trader_id),
                 INDEX idx_res_type (type)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
             """
         )
         connection.commit()
@@ -356,7 +367,7 @@ def ensure_resource_documents(connection):
                 notes TEXT NULL,
                 FOREIGN KEY (trader_id) REFERENCES users(id) ON DELETE CASCADE,
                 INDEX idx_resource_docs_trader (trader_id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
             """
         )
         connection.commit()
@@ -374,7 +385,7 @@ def ensure_wallet_tables(connection):
                 reserved DECIMAL(18,6) NOT NULL DEFAULT 0,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
             """
         )
         cur.execute(
@@ -390,7 +401,7 @@ def ensure_wallet_tables(connection):
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                 INDEX idx_wallet_user (user_id),
                 INDEX idx_wallet_created (created_at)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
             """
         )
         connection.commit()
