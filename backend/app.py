@@ -36,12 +36,15 @@ def _ensure_directories(app: Flask) -> None:
     app.config.setdefault("GENERATED_DOCS_ROOT", generated_docs)
 
 from .errors import RegisterErrorRoutes
+from .db import init_all_tables
 
 def create_app() -> Flask:
     app = Flask(__name__)
     RegisterErrorRoutes(app)
     CORS(app)
     _ensure_directories(app)
+    with app.app_context():
+        init_all_tables()
     for blueprint in _load_blueprints():
         app.register_blueprint(blueprint)
     return app

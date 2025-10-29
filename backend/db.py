@@ -5,25 +5,43 @@ import datetime
 from .config import DB_CONFIG
 from .errors import DBError
 
+def create_database_if_not_exists():
+    try:
+        connection = connect(**DB_CONFIG)
+        connection.close()
+        return True
+    except Error as e:
+        if "Unknown database" in str(e):
+            try:
+                base_config = {k: v for k, v in DB_CONFIG.items() if k != "database"}
+                base_conn = connect(**base_config)
+                cur = base_conn.cursor()
+                cur.execute(f"CREATE DATABASE IF NOT EXISTS `{DB_CONFIG['database']}` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+                base_conn.commit()
+                print(f"База даних '{DB_CONFIG['database']}' успішно створена")
+                cur.close()
+                base_conn.close()
+                return True
+            except Error as create_error:
+                print(f"Помилка при створенні бази даних: {create_error}")
+                raise DBError("Не вдалося створити базу даних", details=str(create_error)) from create_error
+        else:
+            print(f"Помилка підключення до MySQL: {e}")
+            raise DBError("Не вдалося підключитися до бази даних", details=str(e)) from e
+
 def db_connection():
     try:
         connection = connect(**DB_CONFIG)
         return connection
     except Error as e:
         if "Unknown database" in str(e):
-            base_config = {}
-            for k, v in DB_CONFIG.items():
-                if k != "database":
-                    base_config[k] = v
-            base_conn = connect(**base_config)
-            cur = base_conn.cursor()
-            cur.execute(f"CREATE DATABASE {DB_CONFIG['database']}")
-            base_conn.commit()
-            cur.close()
-            base_conn.close()
-            connection = connect(**DB_CONFIG)
-            return connection
-        raise DBError("Connection failed", details=str(e)) from e
+            create_database_if_not_exists()
+            try:
+                connection = connect(**DB_CONFIG)
+                return connection
+            except Error as retry_error:
+                raise DBError("Не вдалося підключитися до бази даних після створення", details=str(retry_error)) from retry_error
+        raise DBError("Не вдалося підключитися до бази даних", details=str(e)) from e
 
 def ensure_users_table(connection):
     cursor = connection.cursor()
@@ -320,7 +338,7 @@ def ensure_trader_inventory(connection):
             """
             CREATE TABLE IF NOT EXISTS trader_inventory (
                 trader_id INT NOT NULL,
-                product VARCHAR(255) NOT NULL,
+                product VARCHAR(191) NOT NULL,
                 quantity DECIMAL(18,6) NOT NULL DEFAULT 0,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 PRIMARY KEY (trader_id, product),
@@ -408,7 +426,33 @@ def ensure_wallet_tables(connection):
     finally:
         cur.close()
 
-__all__ = ['db_connection',
+def init_all_tables():
+    try:
+        create_database_if_not_exists()
+        conn = db_connection()
+        ensure_users_table(conn)
+        ensure_user_profiles(conn)
+        ensure_listings_table(conn)
+        ensure_orders_table(conn)
+        ensure_trades_table(conn)
+        ensure_auctions_tables(conn)
+        ensure_trader_inventory(conn)
+        ensure_resource_transactions(conn)
+        ensure_resource_documents(conn)
+        ensure_wallet_tables(conn)
+        try_add_owner_columns(conn)
+        conn.close()
+        print("Всі таблиці успішно створено/перевірено!")
+        return True
+    except DBError as e:
+        print(f"Помилка при ініціалізації таблиць: {e}")
+        return False
+    except Exception as e:
+        return False
+
+__all__ = [
+    'db_connection',
+    'create_database_if_not_exists',
     'ensure_users_table',
     'ensure_user_profiles',
     'ensure_listings_table',
@@ -420,4 +464,5 @@ __all__ = ['db_connection',
     'ensure_resource_documents',
     'ensure_wallet_tables',
     'try_add_owner_columns',
+    'init_all_tables',
 ]
