@@ -8,7 +8,6 @@ backend/__pycache__/errors.cpython-313.pyc
 .venv/
 venv/
 .env
-.env.*
 .trunk/
 trunk/
 trunk
