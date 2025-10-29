@@ -408,8 +408,7 @@ def ensure_wallet_tables(connection):
     finally:
         cur.close()
 
-__all__ = [
-    'db_connection',
+__all__ = ['db_connection',
     'ensure_users_table',
     'ensure_user_profiles',
     'ensure_listings_table',
