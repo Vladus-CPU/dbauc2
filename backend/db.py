@@ -320,7 +320,7 @@ def ensure_trader_inventory(connection):
             """
             CREATE TABLE IF NOT EXISTS trader_inventory (
                 trader_id INT NOT NULL,
-                product VARCHAR(255) NOT NULL,
+                product VARCHAR(191) NOT NULL,
                 quantity DECIMAL(18,6) NOT NULL DEFAULT 0,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 PRIMARY KEY (trader_id, product),
@@ -408,7 +408,8 @@ def ensure_wallet_tables(connection):
     finally:
         cur.close()
 
-__all__ = ['db_connection',
+__all__ = [
+    'db_connection',
     'ensure_users_table',
     'ensure_user_profiles',
     'ensure_listings_table',
@@ -420,4 +421,5 @@ __all__ = ['db_connection',
     'ensure_resource_documents',
     'ensure_wallet_tables',
     'try_add_owner_columns',
+    'init_all_tables',
 ]
