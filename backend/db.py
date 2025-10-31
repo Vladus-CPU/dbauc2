@@ -320,7 +320,11 @@ def ensure_trader_inventory(connection):
             """
             CREATE TABLE IF NOT EXISTS trader_inventory (
                 trader_id INT NOT NULL,
+<<<<<<< HEAD
                 product VARCHAR(255) NOT NULL,
+=======
+                product VARCHAR(191) NOT NULL,
+>>>>>>> a4bfcf4425373ef479ca8fe1bb8bdf555b55d1fc
                 quantity DECIMAL(18,6) NOT NULL DEFAULT 0,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 PRIMARY KEY (trader_id, product),
@@ -420,4 +424,8 @@ __all__ = ['db_connection',
     'ensure_resource_documents',
     'ensure_wallet_tables',
     'try_add_owner_columns',
+<<<<<<< HEAD
+=======
+    'init_all_tables',
+>>>>>>> a4bfcf4425373ef479ca8fe1bb8bdf555b55d1fc
 ]

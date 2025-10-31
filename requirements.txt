@@ -6,4 +6,8 @@ passlib[bcrypt]>=1.7.4
 bcrypt==4.0.1
 requests>=2.31
 gunicorn>=21.2
+<<<<<<< HEAD
 python-dotenv>=1.0.0
+=======
+python-dotenv>=1.0.0
+>>>>>>> a4bfcf4425373ef479ca8fe1bb8bdf555b55d1fc
