@@ -225,16 +225,48 @@ function createTraderTools(auction, session, refresh) {
 
 function createCollectingCard(auction, session, refresh) {
   const card = el('article', { className: 'stack-card auction-card' });
+
+  // Визначаємо стан вікна торгів
+  const now = new Date();
+  const windowStart = auction.window_start ? new Date(auction.window_start) : null;
+  const windowEnd = auction.window_end ? new Date(auction.window_end) : null;
+  let windowStatus = 'active';
+  let windowMessage = 'Торги активні';
+
+  if (windowStart && now < windowStart) {
+    windowStatus = 'upcoming';
+    const diff = windowStart - now;
+    const hours = Math.floor(diff / 3600000);
+    const minutes = Math.floor((diff % 3600000) / 60000);
+    windowMessage = `Початок через ${hours}г ${minutes}хв`;
+  } else if (windowEnd && now > windowEnd) {
+    windowStatus = 'ended';
+    windowMessage = 'Вікно торгів закрито';
+  } else if (windowEnd) {
+    const diff = windowEnd - now;
+    const hours = Math.floor(diff / 3600000);
+    const minutes = Math.floor((diff % 3600000) / 60000);
+    windowMessage = `До завершення: ${hours}г ${minutes}хв`;
+  }
+
   const header = el('div', { className: 'stack-card__header' },
     el('strong', {}, `#${auction.id} ${auction.product}`),
     el('span', { className: 'pill pill--outline' }, auction.type),
-    el('span', { className: 'chip chip--accent' }, statusLabel(auction.status)),
+    el('span', {
+      className: `chip ${windowStatus === 'active' ? 'chip--accent' : windowStatus === 'ended' ? 'chip--danger' : ''}`
+    }, statusLabel(auction.status)),
     el('span', { className: 'chip' }, `k = ${auction.k_value}`)
   );
+
   const meta = el('div', { className: 'auction-card__meta' },
     el('span', {}, `Старт • ${formatDate(auction.window_start)}`),
-    el('span', {}, `Завершення • ${formatDate(auction.window_end)}`)
+    el('span', {}, `Завершення • ${formatDate(auction.window_end)}`),
+    el('span', {
+      className: `auction-window-status auction-window-status--${windowStatus}`,
+      style: 'font-weight: 600;'
+    }, windowMessage)
   );
+
   const actions = el('div', { className: 'auction-card__actions' },
     el('a', { className: 'btn btn-ghost btn-compact', href: `auction.html?id=${auction.id}` }, 'Відкрити книгу ордерів')
   );
@@ -412,7 +444,7 @@ function attachUI(){
   if (quickPills){
     quickPills.addEventListener('click', (e)=>{
       const btn = e.target.closest('button[data-filter-status]');
-      if(!btn) return; 
+      if(!btn) return;
       const status = btn.getAttribute('data-filter-status');
       state.filters.status = status;
       [...quickPills.querySelectorAll('button')].forEach(b=>b.classList.toggle('is-active', b===btn));

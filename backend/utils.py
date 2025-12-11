@@ -15,7 +15,15 @@ def serialize(data: Any) -> Any:
             return str(data)
     if isinstance(data, (datetime.datetime, datetime.date)):
         try:
-            return data.isoformat()
+            iso_str = data.isoformat()
+            # Ensure timezone-aware datetimes have Z suffix for JavaScript
+            if isinstance(data, datetime.datetime) and data.tzinfo is not None and not iso_str.endswith('Z'):
+                # Add Z if it's UTC timezone but doesn't have Z or +00:00 suffix
+                if '+00:00' in iso_str:
+                    iso_str = iso_str.replace('+00:00', 'Z')
+                elif not iso_str.endswith('Z'):
+                    iso_str = iso_str + 'Z'
+            return iso_str
         except Exception:
             return str(data)
     return data

@@ -16,7 +16,7 @@ from ..db import (
     ensure_wallet_tables,
 )
 from ..errors import AppError, DBError, OrderDataError
-from ..security import get_auth_user, require_admin
+from ..security import get_auth_user, require_admin, require_auth
 from ..services.auction import compute_k_double_clearing
 from ..services.wallet import wallet_deposit, wallet_release, wallet_reserve, wallet_spend
 from ..utils import is_admin, is_trader, serialize, to_decimal
@@ -35,6 +35,10 @@ def list_auctions():
         auction_type = request.args.get('type')
         where = []
         params: List = []
+
+        # Показуємо тільки схвалені аукціони для публічного списку
+        where.append("approval_status = 'approved'")
+
         if status in ('collecting', 'cleared', 'closed'):
             where.append('status = %s')
             params.append(status)
@@ -51,6 +55,52 @@ def list_auctions():
         cur.close()
         conn.close()
 
+@auctions_bp.get('/auctions/<int:auction_id>/clearing-history')
+def get_clearing_history(auction_id: int):
+    """ОТРИМАННЯ ІСТОРІЇ РАУНДІВ КЛІРИНГУ (ПУБЛІЧНИЙ ENDPOINT)"""
+    conn = db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        ensure_auctions_tables(conn)
+        cursor.execute("SELECT id FROM auctions WHERE id = %s", (auction_id,))
+        if not cursor.fetchone():
+            raise AppError("Auction not found", statuscode=404)
+
+        # Check if table exists
+        cursor.execute("SHOW TABLES LIKE 'auction_clearing_rounds'")
+        if not cursor.fetchone():
+            # Table doesn't exist yet - return empty result
+            return jsonify({"auctionId": auction_id, "rounds": [], "count": 0}), 200
+
+        cursor.execute(
+            """
+            SELECT id, round_number, clearing_price, clearing_volume,
+                   clearing_demand, clearing_supply, total_bids, total_asks,
+                   matched_orders, cleared_at
+            FROM auction_clearing_rounds
+            WHERE auction_id = %s
+            ORDER BY round_number DESC
+            """,
+            (auction_id,)
+        )
+        rounds = cursor.fetchall()
+        result = [{
+            "id": r['id'],
+            "roundNumber": r['round_number'],
+            "clearingPrice": float(r['clearing_price']) if r['clearing_price'] else None,
+            "clearingVolume": float(r['clearing_volume']) if r['clearing_volume'] else None,
+            "clearingDemand": float(r['clearing_demand']) if r['clearing_demand'] else None,
+            "clearingSupply": float(r['clearing_supply']) if r['clearing_supply'] else None,
+            "totalBids": r['total_bids'],
+            "totalAsks": r['total_asks'],
+            "matchedOrders": r['matched_orders'],
+            "clearedAt": r['cleared_at'].isoformat() if r['cleared_at'] else None
+        } for r in rounds]
+        return jsonify({"auctionId": auction_id, "rounds": result, "count": len(result)}), 200
+    finally:
+        cursor.close()
+        conn.close()
+
 @auctions_bp.get('/auctions/<int:auction_id>/book')
 def auction_order_book(auction_id: int):
     conn = db_connection()
@@ -61,7 +111,7 @@ def auction_order_book(auction_id: int):
         user = get_auth_user(conn)
         admin_view = bool(user and is_admin(user))
         cur.execute(
-            "SELECT id, product, type, status, k_value, window_start, window_end, created_at, closed_at "
+            "SELECT id, product, type, status, k_value, window_start, window_end, created_at, closed_at, creator_id, approval_status, next_clearing_at "
             "FROM auctions WHERE id=%s",
             (auction_id,)
         )
@@ -134,13 +184,6 @@ def auction_order_book(auction_id: int):
                 if candidate > Decimal('1'):
                     candidate = Decimal('1')
                 adaptive_k = float(candidate)
-                if abs(candidate - base_k) >= Decimal('0.01'):
-                    try:
-                        cur.execute("UPDATE auctions SET k_value=%s WHERE id=%s", (str(candidate), auction_id))
-                        conn.commit()
-                        auction['k_value'] = str(candidate)
-                    except Exception:
-                        conn.rollback()
             else:
                 adaptive_k = float(base_k)
         except Exception:
@@ -189,10 +232,39 @@ def auction_order_book(auction_id: int):
             "lastClearingQuantity": cleared_entries[0]['quantity'] if cleared_entries else None,
             "kValue": float(auction['k_value']) if auction.get('k_value') is not None else None,
             "adaptiveK": adaptive_k,
+            "recommendedK": adaptive_k,
             "adaptiveKAlpha": 0.15,
         }
         recent_bid_orders = sorted(bid_orders, key=lambda o: (o['price'], o['created_at']), reverse=True)[:10]
         recent_ask_orders = sorted(ask_orders, key=lambda o: (o['price'], o['created_at']))[:10]
+        
+        # Ensure next_clearing_at is set - if NULL or in past, set to 5 minutes from now
+        now = datetime.datetime.utcnow()
+        next_clear_at = auction.get('next_clearing_at')
+        
+        # Check if we need to update next_clearing_at in DB
+        # Both should be naive UTC datetimes, so direct comparison works
+        should_update = next_clear_at is None or next_clear_at < now
+        
+        if should_update:
+            future_time = now + datetime.timedelta(minutes=5)
+            auction['next_clearing_at'] = future_time
+            print(f"[AUCTION {auction_id}] Updating next_clearing_at from {next_clear_at} to {future_time}")
+            # Update database - use a fresh cursor for this operation
+            try:
+                update_cur = conn.cursor()
+                update_cur.execute(
+                    "UPDATE auctions SET next_clearing_at=%s WHERE id=%s",
+                    (future_time, auction_id)
+                )
+                rows_updated = update_cur.rowcount
+                conn.commit()
+                update_cur.close()
+                print(f"[AUCTION {auction_id}] Updated {rows_updated} rows in DB")
+            except Exception as e:
+                conn.rollback()
+                print(f"ERROR: Failed to update next_clearing_at in DB for auction {auction_id}: {e}")
+        
         response = {
             "auction": serialize(auction),
             "book": {
@@ -207,6 +279,14 @@ def auction_order_book(auction_id: int):
             "recentClearing": cleared_entries,
             "visibility": 'admin' if admin_view else 'sealed'
         }
+        
+        # Ensure next_clearing_at has Z suffix for JavaScript timezone handling
+        if response['auction'].get('next_clearing_at') and isinstance(response['auction']['next_clearing_at'], str):
+            if not response['auction']['next_clearing_at'].endswith('Z'):
+                response['auction']['next_clearing_at'] = response['auction']['next_clearing_at'].replace('+00:00', 'Z')
+                if '+' not in response['auction']['next_clearing_at'] and 'Z' not in response['auction']['next_clearing_at']:
+                    response['auction']['next_clearing_at'] = response['auction']['next_clearing_at'] + 'Z'
+        
         if not admin_view:
             response['book'] = {"bids": [], "asks": []}
             response['recentOrders'] = {"bids": [], "asks": []}
@@ -216,7 +296,7 @@ def auction_order_book(auction_id: int):
                 "totalBidQuantity", "totalAskQuantity", "bidOrderCount", "askOrderCount",
                 "bestBidDepth", "bestAskDepth", "bestBidOrders", "bestAskOrders",
                 "depthImbalance", "top3BidDepth", "top3AskDepth", "top3BidOrders",
-                "top3AskOrders", "adaptiveK"
+                "top3AskOrders", "adaptiveK", "recommendedK"
             ]:
                 if key in restricted_metrics:
                     restricted_metrics[key] = None
@@ -229,6 +309,7 @@ def auction_order_book(auction_id: int):
 @auctions_bp.post('/admin/auctions')
 @require_admin
 def create_auction():
+    """АДМІН створює аукціон (одразу схвалений)"""
     user = g.get('user')
     if not user or not is_admin(user):
         raise AppError("Forbidden", statuscode=403)
@@ -283,9 +364,12 @@ def create_auction():
             raise OrderDataError("Field 'k' must be between 0 and 1")
         insert_cur = conn.cursor()
         try:
+            # Встановлюємо наступний кліринг на 5 хвилин від тепер
+            now_utc = datetime.datetime.utcnow()
+            next_clearing = now_utc + datetime.timedelta(minutes=5)
             insert_cur.execute(
-                "INSERT INTO auctions (product, type, k_value, window_start, window_end, admin_id, listing_id) VALUES (%s,%s,%s,%s,%s,%s,%s)",
-                (product, auction_type, str(k_dec), window_start_dt, window_end_dt, user['id'], listing_id_value)
+                "INSERT INTO auctions (product, type, k_value, window_start, window_end, admin_id, creator_id, listing_id, approval_status, next_clearing_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'approved',%s)",
+                (product, auction_type, str(k_dec), window_start_dt, window_end_dt, user['id'], user['id'], listing_id_value, next_clearing)
             )
             auction_id = insert_cur.lastrowid
         finally:
@@ -304,6 +388,78 @@ def create_auction():
         return jsonify({"message": "Auction created", "id": auction_id}), 201
     except AppError:
         raise
+    except Exception as exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise DBError("Error creating auction", details=str(exception)) from exception
+    finally:
+        conn.close()
+
+
+@auctions_bp.post('/auctions')
+@require_auth
+def create_user_auction():
+    """КОРИСТУВАЧ створює аукціон (потребує схвалення адміна)"""
+    user = g.get('user')
+    if not user:
+        raise AppError("Unauthorized", statuscode=401)
+
+    data = request.get_json(silent=True) or {}
+    product = (data.get('product') or '').strip()
+    auction_type = (data.get('type') or 'open').strip()
+    k_value = data.get('k', 0.5)
+    window_start = data.get('windowStart')
+    window_end = data.get('windowEnd')
+
+    if not product:
+        raise OrderDataError("Field 'product' is required")
+    if auction_type not in ('open', 'closed'):
+        raise OrderDataError("Field 'type' must be 'open' or 'closed'")
+
+    def parse_dt(value):
+        if not value:
+            return None
+        try:
+            return datetime.datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+        except Exception as e:
+            raise OrderDataError("Invalid datetime format (use ISO 8601)") from e
+
+    window_start_dt = parse_dt(window_start)
+    window_end_dt = parse_dt(window_end)
+
+    try:
+        k_dec = to_decimal(k_value)
+    except OrderDataError as e:
+        raise OrderDataError("Field 'k' must be a number between 0 and 1") from e
+    if k_dec < Decimal('0') or k_dec > Decimal('1'):
+        raise OrderDataError("Field 'k' must be between 0 and 1")
+
+    conn = db_connection()
+    try:
+        ensure_auctions_tables(conn)
+        cur = conn.cursor()
+        try:
+            # Встановлюємо наступний кліринг на 5 хвилин від тепер
+            next_clearing = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=5)
+            cur.execute(
+                """
+                INSERT INTO auctions
+                (product, type, k_value, window_start, window_end, creator_id, approval_status, status, next_clearing_at)
+                VALUES (%s,%s,%s,%s,%s,%s,'pending','collecting',%s)
+                """,
+                (product, auction_type, str(k_dec), window_start_dt, window_end_dt, user['id'], next_clearing)
+            )
+            auction_id = cur.lastrowid
+        finally:
+            cur.close()
+        conn.commit()
+        return jsonify({
+            "message": "Auction submitted for approval",
+            "id": auction_id,
+            "approval_status": "pending"
+        }), 201
     except Exception as exception:
         try:
             conn.rollback()
@@ -576,6 +732,64 @@ def list_auction_orders_admin(auction_id: int):
         cur.close()
         conn.close()
 
+@auctions_bp.patch('/admin/auctions/<int:auction_id>/k/confirm')
+@require_admin
+def confirm_auction_k(auction_id: int):
+    """АДМІН ПІДТВЕРДЖУЄ НОВЕ ЗНАЧЕННЯ K ДЛЯ АУКЦІОНУ
+
+    Body: { "k": number in [0,1] } or { "recommendedK": number }
+    """
+    payload = request.get_json(silent=True) or {}
+    k_raw = payload.get('k', payload.get('recommendedK'))
+    if k_raw is None:
+        raise OrderDataError("Field 'k' is required")
+    try:
+        k_value = to_decimal(k_raw)
+    except OrderDataError as e:
+        raise OrderDataError("Field 'k' must be a number between 0 and 1") from e
+    if k_value < Decimal('0') or k_value > Decimal('1'):
+        raise OrderDataError("Field 'k' must be between 0 and 1")
+
+    conn = db_connection()
+    cur = conn.cursor(dictionary=True)
+    try:
+        ensure_auctions_tables(conn)
+        cur.execute("SELECT id FROM auctions WHERE id=%s", (auction_id,))
+        if not cur.fetchone():
+            raise AppError("Auction not found", statuscode=404)
+        admin_user = g.get('user')
+        cur.close()
+        cur = conn.cursor()
+        cur.execute(
+            "UPDATE auctions SET k_value=%s, admin_id=%s WHERE id=%s",
+            (str(k_value), admin_user['id'] if admin_user else None, auction_id)
+        )
+        conn.commit()
+        return jsonify({
+            "message": "K value updated",
+            "auctionId": auction_id,
+            "k": float(k_value),
+            "confirmedBy": (admin_user or {}).get('username')
+        }), 200
+    except AppError:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise DBError("Error updating k", details=str(e)) from e
+    finally:
+        try:
+            cur.close()
+        except Exception:
+            pass
+        conn.close()
+
 @auctions_bp.delete('/auctions/<int:auction_id>/orders/<int:order_id>')
 def cancel_auction_order(auction_id: int, order_id: int):
     conn = db_connection()
@@ -812,6 +1026,12 @@ def clear_auction(auction_id: int):
                     auction_id=auction_id,
                     order_id=row['id']
                 )
+        # Встановлюємо час наступного клірингу на 5 хвилин від тепер
+        next_clearing = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=5)
+        cur.execute(
+            "UPDATE auctions SET next_clearing_at=%s WHERE id=%s",
+            (next_clearing, auction_id)
+        )
         conn.commit()
         for row in raw_orders:
             cleared_qty = allocation_map.get(row['id'], Decimal('0'))

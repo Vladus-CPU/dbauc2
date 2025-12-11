@@ -9,6 +9,7 @@ import {
     createListingAuction,
     listAuctions,
 } from '../api.js';
+import { getPendingAuctions, getApprovedAuctions, approveAuction, rejectAuction } from '../api/admin.js';
 import { showToast } from '../ui/toast.js';
 import { initAccessControl } from '../ui/session.js';
 import { debounce, createLocker, withButtonLoading } from '../lib/asyncUtils.js';
@@ -57,6 +58,9 @@ const state = {
     selected: null,
     loading: false,
     editorBusy: false,
+    userAuctions: [],
+    userAuctionsVisible: true,
+    userAuctionsMode: 'pending', // 'pending' or 'approved'
 };
 
 let summaryRequestId = 0;
@@ -69,6 +73,7 @@ const els = {
     statsPublished: document.getElementById('stat-published'),
     statsDraft: document.getElementById('stat-draft'),
     statsArchived: document.getElementById('stat-archived'),
+    statsPending: document.getElementById('stat-pending'),
     filtersForm: document.getElementById('inventory-filters'),
     searchInput: document.getElementById('filter-search'),
     statusSelect: document.getElementById('filter-status'),
@@ -99,9 +104,27 @@ const els = {
     imageInput: document.getElementById('listing-image'),
     descriptionInput: document.getElementById('listing-description'),
     listingIdInput: document.getElementById('listing-id'),
+    userAuctionsList: document.getElementById('user-auctions-list'),
+    userAuctionsSection: document.getElementById('user-auctions-section'),
+    toggleUserAuctions: document.getElementById('toggle-user-auctions'),
+    showPendingAuctions: document.getElementById('show-pending-auctions'),
+    showApprovedAuctions: document.getElementById('show-approved-auctions'),
 };
 
 const withLock = createLocker();
+
+// Small helper to avoid hanging fetches; rejects after timeoutMs
+async function withTimeout(promise, timeoutMs = 8000, label = 'request') {
+    let timeoutId;
+    const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(`${label} перевищив час очікування`)), timeoutMs);
+    });
+    try {
+        return await Promise.race([promise, timeoutPromise]);
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
 
 function formatCurrency(value) {
     if (value === null || value === undefined || Number.isNaN(Number(value))) {
@@ -378,6 +401,247 @@ function highlightSelectedRow() {
     }
 }
 
+async function loadUserAuctions() {
+    if (!els.userAuctionsList) {
+        console.warn('userAuctionsList element not found');
+        return;
+    }
+
+    console.log('[loadUserAuctions] Starting, mode:', state.userAuctionsMode);
+
+    // Show loading spinner
+    els.userAuctionsList.innerHTML = `
+        <div class="loading-state">
+            <div class="spinner"></div>
+            <p>Завантаження заявок...</p>
+        </div>
+    `;
+
+    // Fallback timer so spinner never hangs indefinitely
+    let timeoutId = null;
+    timeoutId = setTimeout(() => {
+        if (!state.userAuctions.length && els.userAuctionsList) {
+            els.userAuctionsList.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">⏳</div>
+                    <p class="empty-state-text">Тривале завантаження... спробуйте оновити</p>
+                    <button type="button" class="btn btn-primary btn-compact" onclick="location.reload()">Оновити сторінку</button>
+                </div>
+            `;
+        }
+    }, 6000);
+
+    try {
+        // Always load pending count for stats
+        let pendingCount = 0;
+        if (state.userAuctionsMode === 'pending') {
+            console.log('[loadUserAuctions] Fetching pending auctions...');
+            const pending = await withTimeout(getPendingAuctions(), 8000, 'Pending auctions');
+            console.log('[loadUserAuctions] Raw pending response:', pending);
+            console.log('[loadUserAuctions] Is array?', Array.isArray(pending));
+            state.userAuctions = Array.isArray(pending) ? pending : [];
+            pendingCount = state.userAuctions.length;
+            console.log('[loadUserAuctions] Pending auctions loaded:', pendingCount);
+        } else {
+            console.log('[loadUserAuctions] Fetching approved auctions...');
+            const approved = await withTimeout(getApprovedAuctions(), 8000, 'Approved auctions');
+            console.log('[loadUserAuctions] Raw approved response:', approved);
+            state.userAuctions = Array.isArray(approved) ? approved : [];
+            // Still fetch pending count for stats
+            try {
+                const pending = await withTimeout(getPendingAuctions(), 8000, 'Pending count');
+                pendingCount = Array.isArray(pending) ? pending.length : 0;
+            } catch (e) {
+                console.warn('Could not fetch pending count', e);
+            }
+        }
+
+        if (els.statsPending) {
+            els.statsPending.textContent = pendingCount;
+        }
+
+        if (els.showPendingAuctions && els.showApprovedAuctions) {
+            if (state.userAuctionsMode === 'pending') {
+                els.showPendingAuctions.classList.add('btn-primary');
+                els.showPendingAuctions.classList.remove('btn-ghost');
+                els.showApprovedAuctions.classList.add('btn-ghost');
+                els.showApprovedAuctions.classList.remove('btn-primary');
+            } else {
+                els.showApprovedAuctions.classList.add('btn-primary');
+                els.showApprovedAuctions.classList.remove('btn-ghost');
+                els.showPendingAuctions.classList.add('btn-ghost');
+                els.showPendingAuctions.classList.remove('btn-primary');
+            }
+        }
+
+        console.log('[loadUserAuctions] Rendering user auctions...');
+        renderUserAuctions();
+        console.log('[loadUserAuctions] Complete');
+    } catch (error) {
+        console.error('[loadUserAuctions] Error:', error);
+        console.error('[loadUserAuctions] Error stack:', error?.stack);
+        const errMsg = error?.message || 'Не вдалося завантажити заявки користувачів';
+        if (els.userAuctionsList) {
+            els.userAuctionsList.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">❌</div>
+                    <p class="empty-state-text" style="color: var(--error-color);">${errMsg}</p>
+                    <p style="font-size: 0.85rem; color: rgba(255,255,255,0.5); margin-top: 0.5rem;">Перевірте консоль браузера для деталей</p>
+                    <button type="button" class="btn btn-primary btn-compact" onclick="location.reload()">Перезавантажити</button>
+                </div>
+            `;
+        }
+        showToast(errMsg, 'error');
+    }
+    finally {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+    }
+}
+
+function renderUserAuctions() {
+    if (!els.userAuctionsList) return;
+
+    if (!state.userAuctions.length) {
+        const emptyMsg = state.userAuctionsMode === 'pending'
+            ? 'Немає заявок на модерацію'
+            : 'Немає схвалених заявок користувачів';
+        const emptyIcon = state.userAuctionsMode === 'pending' ? '📭' : '✅';
+        els.userAuctionsList.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">${emptyIcon}</div>
+                <p class="empty-state-text">${emptyMsg}</p>
+            </div>
+        `;
+        return;
+    }
+
+    const fragment = document.createDocumentFragment();
+
+    state.userAuctions.forEach(auction => {
+        const card = document.createElement('div');
+        card.className = 'user-auction-card';
+        card.style.cssText = 'border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; background: var(--surface-color);';
+
+        const header = document.createElement('div');
+        header.style.cssText = 'display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem;';
+
+        const info = document.createElement('div');
+        info.style.flex = '1';
+
+        const title = document.createElement('h4');
+        title.style.cssText = 'margin: 0 0 0.5rem 0; font-size: 1.1rem;';
+        title.textContent = auction.product || `Аукціон #${auction.id}`;
+        info.appendChild(title);
+
+        const meta = document.createElement('div');
+        meta.style.cssText = 'display: flex; gap: 0.75rem; flex-wrap: wrap; font-size: 0.9rem; color: var(--text-muted);';
+
+        const authorBadge = document.createElement('span');
+        authorBadge.className = 'pill-author';
+        authorBadge.textContent = `👤 ${auction.creator_username || 'Невідомо'}`;
+        meta.appendChild(authorBadge);
+
+        const typeBadge = document.createElement('span');
+        typeBadge.className = 'chip';
+        typeBadge.textContent = auction.type === 'open' ? 'Відкритий' : 'Закритий';
+        meta.appendChild(typeBadge);
+
+        const kValue = document.createElement('span');
+        kValue.textContent = `k = ${auction.k_value || 0.5}`;
+        meta.appendChild(kValue);
+
+        const created = document.createElement('span');
+        created.textContent = `📅 ${formatDateTime(auction.created_at)}`;
+        meta.appendChild(created);
+
+        if (state.userAuctionsMode === 'approved' && auction.status) {
+            const statusBadge = document.createElement('span');
+            statusBadge.className = 'chip chip--success';
+            const statusLabel = auctionStatusLabels[auction.status] || auction.status;
+            statusBadge.textContent = statusLabel;
+            meta.appendChild(statusBadge);
+        }
+
+        info.appendChild(meta);
+
+        if (auction.window_start || auction.window_end) {
+            const window = document.createElement('div');
+            window.style.cssText = 'margin-top: 0.5rem; font-size: 0.9rem;';
+            if (auction.window_start) {
+                window.innerHTML += `<div>Старт: ${formatDateTime(auction.window_start)}</div>`;
+            }
+            if (auction.window_end) {
+                window.innerHTML += `<div>Завершення: ${formatDateTime(auction.window_end)}</div>`;
+            }
+            info.appendChild(window);
+        }
+
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display: flex; gap: 0.5rem; flex-direction: column;';
+
+        if (state.userAuctionsMode === 'pending') {
+            const approveBtn = document.createElement('button');
+            approveBtn.type = 'button';
+            approveBtn.className = 'btn btn-primary btn-compact';
+            approveBtn.textContent = 'Схвалити';
+            approveBtn.dataset.auctionId = auction.id;
+            approveBtn.dataset.action = 'approve';
+            actions.appendChild(approveBtn);
+
+            const rejectBtn = document.createElement('button');
+            rejectBtn.type = 'button';
+            rejectBtn.className = 'btn btn-danger btn-compact';
+            rejectBtn.textContent = 'Відхилити';
+            rejectBtn.dataset.auctionId = auction.id;
+            rejectBtn.dataset.action = 'reject';
+            actions.appendChild(rejectBtn);
+        } else {
+            const viewBtn = document.createElement('a');
+            viewBtn.href = `auction.html?id=${auction.id}`;
+            viewBtn.className = 'btn btn-primary btn-compact';
+            viewBtn.textContent = 'Переглянути';
+            viewBtn.style.textDecoration = 'none';
+            viewBtn.style.textAlign = 'center';
+            actions.appendChild(viewBtn);
+        }
+
+        header.append(info, actions);
+        card.appendChild(header);
+
+        if (auction.approval_note) {
+            const note = document.createElement('div');
+            note.style.cssText = 'margin-top: 0.5rem; padding: 0.5rem; background: var(--background-secondary); border-radius: 4px; font-size: 0.9rem;';
+            note.textContent = `Примітка: ${auction.approval_note}`;
+            card.appendChild(note);
+        }
+
+        fragment.appendChild(card);
+    });
+
+    els.userAuctionsList.replaceChildren(fragment);
+}
+
+async function handleUserAuctionAction(auctionId, action) {
+    try {
+        if (action === 'approve') {
+            const note = prompt('Додати примітку (необов\'язково):');
+            await approveAuction(auctionId, note || undefined);
+            showToast('Аукціон схвалено', 'success');
+        } else if (action === 'reject') {
+            const note = prompt('Причина відхилення (необов\'язково):');
+            await rejectAuction(auctionId, note || undefined);
+            showToast('Аукціон відхилено', 'success');
+        }
+        await loadUserAuctions();
+        await loadListings();
+    } catch (error) {
+        console.error('User auction action failed', error);
+        showToast(error?.message || 'Не вдалося виконати дію', 'error');
+    }
+}
+
 function setEditorDisabled(disabled) {
     if (!els.editorForm) return;
     Array.from(els.editorForm.elements).forEach((el) => {
@@ -481,10 +745,21 @@ function resetEditorForm() {
 
 async function loadListings({ preserveSelection = true } = {}) {
     if (!els.tableBody) return;
+    console.log('[loadListings] Starting...');
     state.loading = true;
     setTableLoading(true);
-    const summaryPromise = refreshInventorySummary();
+
+    // Start loading user auctions and summary in parallel
+    console.log('[loadListings] Starting parallel loads...');
+    const userAuctionsPromise = loadUserAuctions().catch(err => {
+        console.error('[loadListings] User auctions failed:', err);
+    });
+    const summaryPromise = refreshInventorySummary().catch(err => {
+        console.error('[loadListings] Summary failed:', err);
+    });
+
     try {
+        console.log('[loadListings] Fetching listings...');
         const result = await getListings({
             detailed: true,
             search: state.filters.search || undefined,
@@ -556,6 +831,8 @@ async function loadListings({ preserveSelection = true } = {}) {
         els.tableBody.innerHTML = '<tr><td colspan="5" class="inventory-empty">Сталася помилка при завантаженні.</td></tr>';
     } finally {
         state.loading = false;
+        // Wait for user auctions to finish loading
+        await userAuctionsPromise;
     }
 }
 
@@ -828,6 +1105,40 @@ function attachEventListeners() {
     if (els.auctionForm) {
         els.auctionForm.addEventListener('submit', handleCreateAuction);
     }
+    if (els.userAuctionsList) {
+        els.userAuctionsList.addEventListener('click', (event) => {
+            const button = event.target.closest('button[data-action]');
+            if (!button) return;
+            const auctionId = Number(button.dataset.auctionId);
+            const action = button.dataset.action;
+            if (auctionId && action) {
+                handleUserAuctionAction(auctionId, action);
+            }
+        });
+    }
+    if (els.toggleUserAuctions) {
+        els.toggleUserAuctions.addEventListener('click', () => {
+            state.userAuctionsVisible = !state.userAuctionsVisible;
+            if (els.userAuctionsList) {
+                els.userAuctionsList.style.display = state.userAuctionsVisible ? 'block' : 'none';
+            }
+            const icon = state.userAuctionsVisible ? '▼' : '▶';
+            const text = state.userAuctionsVisible ? 'Приховати' : 'Показати';
+            els.toggleUserAuctions.textContent = `${icon} ${text}`;
+        });
+    }
+    if (els.showPendingAuctions) {
+        els.showPendingAuctions.addEventListener('click', () => {
+            state.userAuctionsMode = 'pending';
+            loadUserAuctions();
+        });
+    }
+    if (els.showApprovedAuctions) {
+        els.showApprovedAuctions.addEventListener('click', () => {
+            state.userAuctionsMode = 'approved';
+            loadUserAuctions();
+        });
+    }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -842,7 +1153,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!els.tableBody || !els.editorForm) {
         return;
     }
+
+    console.log('Listing page initialized');
+    console.log('User auctions elements:', {
+        list: !!els.userAuctionsList,
+        section: !!els.userAuctionsSection,
+        toggleBtn: !!els.toggleUserAuctions,
+        pendingBtn: !!els.showPendingAuctions,
+        approvedBtn: !!els.showApprovedAuctions,
+        statsPending: !!els.statsPending
+    });
+
+    // Initialize button states
+    if (els.showPendingAuctions) {
+        els.showPendingAuctions.classList.add('btn-primary');
+        els.showPendingAuctions.classList.remove('btn-ghost');
+    }
+
     resetEditorForm();
     attachEventListeners();
-    loadListings();
+        console.log('[DOMContentLoaded] Starting loadListings...');
+        await loadListings();
+        console.log('[DOMContentLoaded] Complete');
 });

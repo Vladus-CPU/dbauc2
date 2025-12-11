@@ -4,6 +4,8 @@ from ..db import (
     db_connection,
     ensure_auctions_tables,
     ensure_trader_inventory,
+    ensure_auction_clearing_rounds,
+    ensure_resource_transactions,
     ensure_user_profiles,
     ensure_users_table,
 )
@@ -90,6 +92,7 @@ def me_auctions():
         if not user:
             raise AppError("Unauthorized", statuscode=401)
         ensure_auctions_tables(conn)
+        # Отримуємо аукціони, де користувач є учасником
         cur.execute(
             """
             SELECT p.auction_id,
@@ -100,15 +103,40 @@ def me_auctions():
                    a.type AS auction_type,
                    a.k_value,
                    a.window_start,
-                   a.window_end
+                   a.window_end,
+                   a.approval_status,
+                   a.approval_note,
+                   a.creator_id,
+                   CASE WHEN a.creator_id = %s THEN 1 ELSE 0 END AS is_creator
             FROM auction_participants p
             JOIN auctions a ON a.id = p.auction_id
             WHERE p.trader_id = %s
-            ORDER BY a.created_at DESC
+            UNION ALL
+            SELECT a.id AS auction_id,
+                   NULL AS participant_status,
+                   a.created_at AS joined_at,
+                   a.product,
+                   a.status AS auction_status,
+                   a.type AS auction_type,
+                   a.k_value,
+                   a.window_start,
+                   a.window_end,
+                   a.approval_status,
+                   a.approval_note,
+                   a.creator_id,
+                   1 AS is_creator
+            FROM auctions a
+            WHERE a.creator_id = %s
+              AND NOT EXISTS (
+                SELECT 1 FROM auction_participants p2
+                WHERE p2.auction_id = a.id AND p2.trader_id = %s
+              )
+            ORDER BY joined_at DESC
             """,
-            (user['id'],)
+            (user['id'], user['id'], user['id'], user['id'])
         )
-        return jsonify(serialize(cur.fetchall()))
+        rows = cur.fetchall()
+        return jsonify(serialize(rows))
     finally:
         cur.close()
         conn.close()
@@ -155,6 +183,108 @@ def me_inventory():
             (user['id'],)
         )
         return jsonify(serialize(cur.fetchall()))
+    finally:
+        cur.close()
+        conn.close()
+
+
+@me_bp.get('/clearing-insights')
+def me_clearing_insights():
+    conn = db_connection()
+    cur = conn.cursor(dictionary=True)
+    try:
+        ensure_users_table(conn)
+        ensure_auctions_tables(conn)
+        ensure_trader_inventory(conn)
+        ensure_auction_clearing_rounds(conn)
+        ensure_resource_transactions(conn)
+        user = get_auth_user(conn)
+        if not user:
+            raise AppError("Unauthorized", statuscode=401)
+
+        # Поточні позиції
+        cur.execute(
+            """
+            SELECT product, quantity, updated_at
+            FROM trader_inventory
+            WHERE trader_id=%s
+            ORDER BY updated_at DESC
+            """,
+            (user['id'],)
+        )
+        positions = serialize(cur.fetchall())
+
+        # Останній кліринговий раунд, в якому був користувач
+        cur.execute(
+            """
+            SELECT acr.auction_id, acr.round_number, acr.clearing_price, acr.clearing_volume,
+                   acr.clearing_demand, acr.clearing_supply, acr.cleared_at,
+                   a.product, a.type
+            FROM auction_clearing_rounds acr
+            JOIN auctions a ON a.id = acr.auction_id
+            WHERE EXISTS (
+              SELECT 1 FROM auction_orders ao
+              WHERE ao.auction_id = acr.auction_id
+                AND ao.trader_id = %s
+                AND ao.status = 'cleared'
+                AND (ao.iteration IS NULL OR ao.iteration = acr.round_number)
+            )
+            ORDER BY acr.cleared_at DESC
+            LIMIT 1
+            """,
+            (user['id'],)
+        )
+        last_round = cur.fetchone()
+
+        # Останні виконані ордери користувача
+        cur.execute(
+            """
+            SELECT ao.id, ao.auction_id, ao.side, ao.cleared_price, ao.cleared_quantity,
+                   ao.iteration, a.product,
+                   COALESCE(acr.cleared_at, ao.created_at) AS cleared_at
+            FROM auction_orders ao
+            JOIN auctions a ON a.id = ao.auction_id
+            LEFT JOIN auction_clearing_rounds acr
+              ON acr.auction_id = ao.auction_id
+             AND (ao.iteration IS NOT NULL AND acr.round_number = ao.iteration)
+            WHERE ao.trader_id = %s AND ao.status = 'cleared'
+            ORDER BY COALESCE(acr.cleared_at, ao.created_at) DESC
+            LIMIT 10
+            """,
+            (user['id'],)
+        )
+        recent_fills = serialize(cur.fetchall())
+
+        # Зміни інвентарю після клірингу
+        cur.execute(
+            """
+            SELECT id, type, quantity, occurred_at, notes
+            FROM resource_transactions
+            WHERE trader_id = %s
+            ORDER BY occurred_at DESC
+            LIMIT 10
+            """,
+            (user['id'],)
+        )
+        inventory_events = serialize(cur.fetchall())
+
+        total_qty = sum(
+            (float(p['quantity']) if p.get('quantity') is not None else 0)
+            for p in positions
+        )
+        summary = {
+            "positions": len(positions),
+            "totalQuantity": total_qty,
+            "lastClearingAt": last_round['cleared_at'].isoformat() if last_round and last_round.get('cleared_at') else None,
+        }
+
+        return jsonify({
+            "summary": summary,
+            "lastRound": serialize(last_round) if last_round else None,
+            "recentFills": recent_fills,
+            "inventoryEvents": inventory_events,
+            "positions": positions,
+        })
     finally:
         cur.close()
         conn.close()

@@ -17,9 +17,8 @@
       </div>
       <nav>
         <a href="index.html" class="nav-link">Головна</a>
-        <a href="listing.html" class="nav-link nav-link--internal" data-role-required="admin">
-          <span>Інвентар</span>
-          <span class="badge badge--outline">ВНУТРІШНЄ</span>
+        <a href="listing.html" class="nav-link nav-link--internal" data-role-required="admin" title="Керування каталогом лотів та створення аукціонів">
+          <span>📦 Каталог</span>
         </a>
         <a href="auctions.html" class="nav-link">Аукціони</a>
         <a href="wallet.html" class="nav-link" data-role-required="auth">Гаманець</a>
@@ -44,6 +43,7 @@
           <nav class="market-tabs__nav" aria-label="Навігація панелей">
             <button type="button" class="tab-btn is-active" data-tab-target="tab-book">Книга</button>
             <button type="button" class="tab-btn" data-tab-target="tab-my-orders">Мої ордери</button>
+            <button type="button" class="tab-btn" data-tab-target="tab-rounds">Раунди</button>
             <button type="button" class="tab-btn" data-role-required="admin" data-tab-target="tab-distribution">Розподіл</button>
             <button type="button" class="tab-btn" data-role-required="admin" data-tab-target="tab-activity">Активність</button>
           </nav>
@@ -96,6 +96,14 @@
                   <h3>Мої ордери</h3>
                 </header>
                 <div id="my-orders-list" class="market-activity__list"></div>
+              </article>
+            </div>
+            <div id="tab-rounds" class="tab-panel">
+              <article class="card market-panel market-panel--compact">
+                <header class="market-panel__header">
+                  <h3>Раунди клірингу</h3>
+                </header>
+                <div id="clearing-rounds-list" class="market-activity__section"></div>
               </article>
             </div>
             <div id="tab-distribution" class="tab-panel" data-role-required="admin">

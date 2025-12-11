@@ -227,21 +227,33 @@ def ensure_auctions_tables(connection):
         )
         for column_name, column_def in [
             ("listing_id", "INT NULL"),
+            ("creator_id", "INT NULL"),
+            ("approval_status", "ENUM('pending','approved','rejected') NOT NULL DEFAULT 'approved'"),
+            ("approval_note", "TEXT NULL"),
             ("clearing_price", "DECIMAL(18,6) NULL"),
             ("clearing_quantity", "DECIMAL(18,6) NULL"),
             ("clearing_demand", "DECIMAL(18,6) NULL"),
             ("clearing_supply", "DECIMAL(18,6) NULL"),
             ("clearing_price_low", "DECIMAL(18,6) NULL"),
             ("clearing_price_high", "DECIMAL(18,6) NULL"),
+            ("current_round", "INT NOT NULL DEFAULT 0"),
+            ("last_clearing_at", "DATETIME NULL"),
+            ("next_clearing_at", "DATETIME NULL"),
         ]:
             try:
                 cur.execute(f"ALTER TABLE auctions ADD COLUMN {column_name} {column_def}")
             except Exception:
                 pass
-        try:
-            cur.execute("ALTER TABLE auctions ADD INDEX idx_auctions_listing (listing_id)")
-        except Exception:
-            pass
+        for index_name, index_def in [
+            ("idx_auctions_listing", "listing_id"),
+            ("idx_auctions_creator", "creator_id"),
+            ("idx_auctions_approval", "approval_status"),
+            ("idx_auctions_next_clearing", "next_clearing_at, status"),
+        ]:
+            try:
+                cur.execute(f"ALTER TABLE auctions ADD INDEX {index_name} ({index_def})")
+            except Exception:
+                pass
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS trader_accounts (
@@ -408,6 +420,68 @@ def ensure_wallet_tables(connection):
     finally:
         cur.close()
 
+def ensure_auction_clearing_rounds(conn):
+    """Створюємо таблицю для історії раундів клірингу"""
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS auction_clearing_rounds (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                auction_id INT NOT NULL,
+                round_number INT NOT NULL,
+                clearing_price DECIMAL(18,6) NULL,
+                clearing_volume DECIMAL(18,6) NULL,
+                clearing_demand DECIMAL(18,6) NULL,
+                clearing_supply DECIMAL(18,6) NULL,
+                total_bids INT NOT NULL DEFAULT 0,
+                total_asks INT NOT NULL DEFAULT 0,
+                matched_orders INT NOT NULL DEFAULT 0,
+                cleared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_rounds_auction (auction_id),
+                INDEX idx_rounds_number (auction_id, round_number)
+            ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4
+        """)
+        conn.commit()
+    finally:
+        cur.close()
+
+def ensure_inventory_snapshots(conn):
+    """Створюємо таблицю для снімків інвентарю після кожного клірингу"""
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS inventory_snapshots (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                auction_id INT NOT NULL,
+                round_number INT NOT NULL,
+                snapshot_data TEXT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_snapshots_auction (auction_id)
+            ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4
+        """)
+        conn.commit()
+    finally:
+        cur.close()
+
+def init_all_tables():
+    conn = db_connection()
+    try:
+        ensure_users_table(conn)
+        ensure_user_profiles(conn)
+        ensure_listings_table(conn)
+        ensure_orders_table(conn)
+        ensure_trades_table(conn)
+        ensure_auctions_tables(conn)
+        ensure_trader_inventory(conn)
+        ensure_resource_transactions(conn)
+        ensure_resource_documents(conn)
+        ensure_wallet_tables(conn)
+        ensure_auction_clearing_rounds(conn)
+        ensure_inventory_snapshots(conn)
+        try_add_owner_columns(conn)
+    finally:
+        conn.close()
+
 __all__ = ['db_connection',
     'ensure_users_table',
     'ensure_user_profiles',
@@ -419,6 +493,8 @@ __all__ = ['db_connection',
     'ensure_resource_transactions',
     'ensure_resource_documents',
     'ensure_wallet_tables',
+    'ensure_auction_clearing_rounds',
+    'ensure_inventory_snapshots',
     'try_add_owner_columns',
     'init_all_tables',
 ]

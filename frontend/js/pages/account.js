@@ -1,4 +1,4 @@
-import { getMyProfile, loginUser, registerUser, setToken, getToken, bootstrapAdmin, meAuctions, meAuctionOrders, meDocuments, meInventory, authorizedFetch } from '../api.js';
+import { getMyProfile, loginUser, registerUser, setToken, getToken, bootstrapAdmin, meAuctions, meAuctionOrders, meDocuments, meInventory, meClearingInsights, authorizedFetch } from '../api.js';
 import { showToast } from '../ui/toast.js';
 import { initAccessControl, clearCachedSession } from '../ui/session.js';
 
@@ -353,6 +353,87 @@ async function renderHoldings(root) {
 	}
 }
 
+async function renderClearingInsights(root) {
+	if (!root) return;
+	root.innerHTML = '';
+	const wrap = el('div', { className: 'stack-grid' });
+	wrap.textContent = 'Завантаження даних клірингу…';
+	root.appendChild(wrap);
+	try {
+		const data = await meClearingInsights();
+		const { summary, lastRound, recentFills, inventoryEvents } = data || {};
+		wrap.innerHTML = '';
+
+		const summaryCard = el('article', { className: 'stack-card' },
+			el('div', { className: 'stack-card__header' },
+				el('strong', {}, 'Після клірингу'),
+				el('span', { className: 'chip' }, `${summary?.positions || 0} позицій`),
+				el('span', { className: 'chip' }, `Σ ${Number(summary?.totalQuantity || 0).toLocaleString('uk-UA', { maximumFractionDigits: 6 })}`)
+			),
+			el('div', { className: 'stack-card__meta' }, summary?.lastClearingAt
+				? `Останній кліринг • ${new Date(summary.lastClearingAt).toLocaleString()}`
+				: 'Очікуємо перший кліринг')
+		);
+		wrap.appendChild(summaryCard);
+
+		const lastRoundCard = el('article', { className: 'stack-card' });
+		const lrHeader = el('div', { className: 'stack-card__header' },
+			el('strong', {}, 'Останній раунд'),
+			lastRound ? el('span', { className: 'chip' }, `Аукціон #${lastRound.auction_id}`) : null,
+			lastRound ? el('span', { className: 'chip' }, `Раунд ${lastRound.round_number}`) : null
+		);
+		lastRoundCard.appendChild(lrHeader);
+		if (lastRound) {
+			lastRoundCard.append(
+				el('div', { className: 'stack-card__meta' }, `${lastRound.product} • ${lastRound.type || 'auction'}`),
+				el('div', { className: 'stack-card__meta' }, `Ціна ${lastRound.clearing_price ?? '—'} × Обсяг ${lastRound.clearing_volume ?? '—'}`),
+				el('div', { className: 'stack-card__meta' }, `Попит ${lastRound.clearing_demand ?? '—'} • Пропозиція ${lastRound.clearing_supply ?? '—'}`),
+				el('div', { className: 'stack-card__meta' }, new Date(lastRound.cleared_at).toLocaleString())
+			);
+		} else {
+			lastRoundCard.appendChild(el('div', { className: 'stack-card__meta' }, 'Ще немає виконаних раундів'));
+		}
+		wrap.appendChild(lastRoundCard);
+
+		const fillsCard = el('article', { className: 'stack-card' });
+		fillsCard.appendChild(el('div', { className: 'stack-card__header' },
+			el('strong', {}, 'Останні виконані ордери'),
+			el('span', { className: 'pill pill--outline' }, `${(recentFills || []).length}`)
+		));
+		if (recentFills && recentFills.length) {
+			recentFills.forEach((f) => {
+				const qty = Number(f.cleared_quantity || f.quantity || 0);
+				const price = f.cleared_price ?? f.price;
+				fillsCard.appendChild(el('div', { className: 'stack-card__meta' },
+					`#${f.auction_id} • ${f.side} • ${price} × ${qty} • ${new Date(f.cleared_at).toLocaleString()}`
+				));
+			});
+		} else {
+			fillsCard.appendChild(el('div', { className: 'stack-card__meta' }, 'Виконані ордери ще не з’явилися'));
+		}
+		wrap.appendChild(fillsCard);
+
+		const invCard = el('article', { className: 'stack-card' });
+		invCard.appendChild(el('div', { className: 'stack-card__header' },
+			el('strong', {}, 'Інвентарні події'),
+			el('span', { className: 'pill pill--outline' }, `${(inventoryEvents || []).length}`)
+		));
+		if (inventoryEvents && inventoryEvents.length) {
+			inventoryEvents.forEach((ev) => {
+				const qty = Number(ev.quantity || 0).toLocaleString('uk-UA', { maximumFractionDigits: 6 });
+				invCard.appendChild(el('div', { className: 'stack-card__meta' },
+					`${ev.type} • ${qty} • ${new Date(ev.occurred_at).toLocaleString()}${ev.notes ? ` • ${ev.notes}` : ''}`
+				));
+			});
+		} else {
+			invCard.appendChild(el('div', { className: 'stack-card__meta' }, 'Ще немає подій інвентарю'));
+		}
+		wrap.appendChild(invCard);
+	} catch (_) {
+		wrap.textContent = 'Не вдалося отримати дані клірингу';
+	}
+}
+
 async function renderDashboard(container, session) {
 	container.innerHTML = '';
 	const shell = el('div', { className: 'dashboard-shell' });
@@ -473,6 +554,18 @@ async function renderDashboard(container, session) {
 		holdingsSection.append(holdingsHeading, holdingsContent);
 		shell.appendChild(holdingsSection);
 		renderHoldings(holdingsContent);
+
+		const clearingSection = el('section', { className: 'dashboard-card' });
+		const clearingHeading = el('div', { className: 'section-heading' },
+			el('span', { className: 'eyebrow' }, 'Кліринг'),
+			el('h2', { className: 'section-heading__title' }, 'Результати після клірингу'),
+			el('p', { className: 'section-heading__meta' }, 'Останній раунд, виконані ордери та події інвентарю.')
+		);
+		const clearingContent = el('div', { className: 'tab-panel' });
+		clearingContent.textContent = 'Завантаження даних…';
+		clearingSection.append(clearingHeading, clearingContent);
+		shell.appendChild(clearingSection);
+		renderClearingInsights(clearingContent);
 	}
 }
 

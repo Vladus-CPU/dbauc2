@@ -1,12 +1,17 @@
 import os
 import sys
-from importlib import import_module
-from flask import Flask
-from flask_cors import CORS
+
 if __name__ == "__main__" and __package__ is None:
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     __package__ = "backend"
-_PACKAGE_ROOT = __package__.split(".")[0]
+
+from importlib import import_module
+from flask import Flask
+from flask_cors import CORS
+from backend.services.clearing_scheduler import start_clearing_scheduler
+from backend.db import init_all_tables
+
+_PACKAGE_ROOT = __package__.split(".")[0] if __package__ else "backend"
 
 def _load_blueprints():
     blueprint_specs = [
@@ -35,15 +40,19 @@ def _ensure_directories(app: Flask) -> None:
     app.config.setdefault("RESOURCE_DOCS_ROOT", resource_docs)
     app.config.setdefault("GENERATED_DOCS_ROOT", generated_docs)
 
-from .errors import RegisterErrorRoutes
 
+from backend.errors import RegisterErrorRoutes
 def create_app() -> Flask:
+    # Ініціалізуємо всі необхідні таблиці в БД
+    init_all_tables()
+    
     app = Flask(__name__)
     RegisterErrorRoutes(app)
     CORS(app)
     _ensure_directories(app)
     for blueprint in _load_blueprints():
         app.register_blueprint(blueprint)
+        start_clearing_scheduler()
     return app
 
 app = create_app()

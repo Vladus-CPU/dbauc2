@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Створити аукціон</title>
+    <link rel="stylesheet" href="css/backgroundstyle.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="logo">    
+            <div class="title-wrap">
+                <h1 class="site-title">Аукціонний дім</h1>
+                <span class="site-description">Ваше універсальне рішення для купівлі та продажу товарів</span>
+            </div>
+        </div>
+        <nav aria-label="Main navigation">
+            <a href="index.html" class="nav-link">Головна</a>
+            <a href="listing.html" class="nav-link nav-link--internal" data-role-required="admin" title="Керування каталогом лотів та створення аукціонів">
+                <span>📦 Каталог</span>
+            </a>
+            <a href="auctions.html" class="nav-link">Аукціони</a>
+            <a href="wallet.html" class="nav-link" data-role-required="auth">Гаманець</a>
+            <a href="account.html" class="nav-link" data-role-required="auth">Профіль</a>
+            <a href="admin.html" class="nav-link" data-role-required="admin" title="Панель адміністратора">⚙️ Адмін</a>
+            <a href="create-auction.html" class="nav-link active" data-role-required="trader">Створити</a>
+        </nav>
+    </header>
+
+    <main class="container">
+        <section class="page-section">
+            <div class="section-header">
+                <h1>Створити новий аукціон</h1>
+                <p>Заповніть форму нижче щоб подати аукціон на модерацію</p>
+            </div>
+
+            <div class="form-container card" style="max-width: 640px; margin: 0 auto;">
+                <form id="create-auction-form" class="stack-form">
+                    <div class="form-group">
+                        <label for="product">Назва продукту *</label>
+                        <input 
+                            type="text" 
+                            id="product" 
+                            name="product" 
+                            required 
+                            placeholder="Наприклад: Пшениця врожай 2024"
+                            class="form-input"
+                        >
+                    </div>
+
+                    <input type="hidden" id="type" name="type" value="open" />
+
+                    <div class="form-group">
+                        <label for="k">Коефіцієнт k *</label>
+                        <input 
+                            type="number" 
+                            id="k" 
+                            name="k" 
+                            min="0" 
+                            max="1" 
+                            step="0.01" 
+                            value="0.5"
+                            required
+                            class="form-input"
+                        >
+                        <small class="form-help">Значення від 0 до 1. Рекомендоване: 0.5</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="windowStart">Початок торгів (опціонально)</label>
+                        <input 
+                            type="datetime-local" 
+                            id="windowStart" 
+                            name="windowStart"
+                            class="form-input"
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="windowEnd">Завершення торгів (опціонально)</label>
+                        <input 
+                            type="datetime-local" 
+                            id="windowEnd" 
+                            name="windowEnd"
+                            class="form-input"
+                        >
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Відправити на модерацію</button>
+                        <button type="button" class="btn btn-secondary" onclick="window.location='auctions.html'">Скасувати</button>
+                    </div>
+                </form>
+
+                <div id="submission-status" style="margin-top: 20px;"></div>
+            </div>
+
+            <div class="card" style="margin-top:40px; padding:24px;">
+                <div id="my-auctions-header"><h3 style="margin:0 0 4px;font-size:1rem;letter-spacing:0.02em;color:#d1ffe3;">Мої подані аукціони</h3></div>
+                <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:10px;">Статуси: <span class="chip chip--warning">На модерації</span> <span class="chip chip--success">Схвалено</span> <span class="chip chip--danger">Відхилено</span></div>
+                <div id="my-auctions-list"></div>
+            </div>
+        </section>
+    </main>
+
+    <div id="toast-container"></div>
+    
+    <script type="module" src="js/pages/create-auction.js"></script>
+</body>
+</html>

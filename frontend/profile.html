@@ -17,14 +17,13 @@
       </div>
       <nav>
         <a href="index.html" class="nav-link">Головна</a>
-        <a href="listing.html" class="nav-link nav-link--internal" data-role-required="admin">
-          <span>Інвентар</span>
-          <span class="badge badge--outline">ВНУТРІШНЄ</span>
+        <a href="listing.html" class="nav-link nav-link--internal" data-role-required="admin" title="Керування каталогом лотів та створення аукціонів">
+          <span>📦 Каталог</span>
         </a>
         <a href="auctions.html" class="nav-link">Аукціони</a>
         <a href="wallet.html" class="nav-link" data-role-required="auth">Гаманець</a>
         <a href="profile.html" class="nav-link nav-link--active">Профіль</a>
-        <a href="admin.html" class="nav-link" data-role-required="admin">Адмін</a>
+        <a href="admin.html" class="nav-link" data-role-required="admin" title="Панель адміністратора">⚙️ Адмін</a>
       </nav>
     </header>
     <main class="container">
@@ -36,6 +35,11 @@
           <span class="eyebrow">Активність</span>
           <h2 class="section-heading__title">Ваша історія торгів</h2>
           <p class="section-heading__meta">Перемикайтеся між аукціонами, ордерами та документами.</p>
+        </div>
+        <div style="margin-bottom: 20px;">
+          <a href="create-auction.html" class="btn btn--primary" style="display: inline-block; padding: 12px 24px; text-decoration: none;">
+            + Створити новий аукціон
+          </a>
         </div>
         <div class="tabs dashboard-tabs">
           <div class="tab tab--active" id="tab-auctions">Мої аукціони</div>

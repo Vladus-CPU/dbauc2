@@ -17,6 +17,17 @@ import {
   adminWalletTransactions,
   seedRandomAuctionOrders,
   cleanupAuctionBots,
+  listPendingAuctionOrders,
+  approveAuctionOrder,
+  rejectAuctionOrder,
+  batchApproveAuctionOrders,
+  batchRejectAuctionOrders,
+  getClearingHistory,
+  getPendingAuctions,
+  approveAuction,
+  rejectAuction,
+  getAuctionBook,
+  confirmAuctionK,
 } from "../api.js";
 import { showToast } from "../ui/toast.js";
 import { initAccessControl } from "../ui/session.js";
@@ -25,6 +36,8 @@ const S = {
   currentUser: null,
   walletSelected: null,
   showBots: false,
+  pendingOrders: [],
+  pendingSelected: new Set(),
 };
 
 const $ = (sel) => document.querySelector(sel);
@@ -206,6 +219,48 @@ function auctionCard(a) {
       "…",
     ),
     (() => {
+      // K-control area (shows current k, recommendedK, and confirm button)
+      const box = el("div", { className: "auction-k-box", style: "display:flex;gap:8px;align-items:center;font-size:0.75rem;color:var(--muted);" },
+        el("span", { className: "chip" }, `k=${a.k_value}`),
+        el("span", { className: "muted" }, "рекомендоване: …")
+      );
+      // Load book metrics to get recommendedK
+      (async () => {
+        try {
+          const data = await getAuctionBook(a.id);
+          const rec = data?.metrics?.recommendedK ?? data?.metrics?.adaptiveK;
+          if (typeof rec === 'number') {
+            // update label
+            box.children[1].textContent = `рекомендоване: ${rec.toFixed(2)}`;
+            // add confirm button if different
+            const currentK = Number(a.k_value);
+            const diff = isFinite(currentK) ? Math.abs(rec - currentK) : 1;
+            const btn = el("button", { className: "btn btn-compact btn-primary" }, "Підтвердити k");
+            btn.addEventListener("click", async () => {
+              btn.disabled = true;
+              try {
+                await confirmAuctionK(a.id, rec);
+                showToast("k оновлено", "success");
+                await render();
+              } catch (e) {
+                showToast(e?.message || "Помилка", "error");
+              } finally {
+                btn.disabled = false;
+              }
+            });
+            if (diff >= 0.005) {
+              box.appendChild(btn);
+            }
+          } else {
+            box.children[1].textContent = "рекомендоване: —";
+          }
+        } catch {
+          box.children[1].textContent = "рекомендоване: —";
+        }
+      })();
+      return box;
+    })(),
+    (() => {
       const actions = el("div", { className: "stack-card__actions" });
       const btnView = el(
         "button",
@@ -222,6 +277,14 @@ function auctionCard(a) {
           onclick: () => loadDocs(a.id, card),
         },
         "Документи",
+      );
+      const btnHistory = el(
+        "button",
+        {
+          className: "btn btn-ghost btn-compact",
+          onclick: () => loadClearingHistory(a.id, card),
+        },
+        "Історія раундів",
       );
       if (a.status === "collecting")
         actions.append(
@@ -245,13 +308,52 @@ function auctionCard(a) {
             "Закрити",
           ),
         );
-      actions.append(btnView, btnDocs);
+      actions.append(btnView, btnDocs, btnHistory);
       return actions;
     })(),
   );
   if (a.status === "collecting") card.append(seedForm(a.id));
   refreshOrdersInfo(a.id);
   return card;
+}
+
+async function loadClearingHistory(auctionId, host) {
+  let wrap = host.querySelector(".clearing-history-wrap");
+  if (!wrap) {
+    wrap = el("div", { className: "data-list clearing-history-wrap" });
+    host.appendChild(wrap);
+  }
+  wrap.hidden = false;
+  wrap.textContent = "Завантаження…";
+  try {
+    const data = await getClearingHistory(auctionId);
+    const rounds = data.rounds || [];
+    if (!rounds.length) {
+      wrap.textContent = "Немає історії раундів";
+      return;
+    }
+    wrap.innerHTML = "";
+    const table = el("table", { style: "width:100%;font-size:0.68rem;border-collapse:collapse;" });
+    const thead = el("thead", {}, el("tr", {}, ["Раунд","Ціна","Обсяг","Попит","Пропозиція","Bid","Ask","Виконано","Час"].map(h => el("th", { style: "padding:4px;border-bottom:1px solid var(--surface-border-soft);text-align:left;" }, h))));
+    const tbody = el("tbody");
+    rounds.forEach(r => {
+      const tr = el("tr", {});
+      tr.appendChild(el("td", { style: "padding:4px;" }, `#${r.roundNumber}`));
+      tr.appendChild(el("td", { style: "padding:4px;" }, r.clearingPrice ? (+r.clearingPrice).toFixed(4) : "—"));
+      tr.appendChild(el("td", { style: "padding:4px;" }, r.clearingVolume ? (+r.clearingVolume).toFixed(4) : "—"));
+      tr.appendChild(el("td", { style: "padding:4px;" }, r.clearingDemand ? (+r.clearingDemand).toFixed(4) : "—"));
+      tr.appendChild(el("td", { style: "padding:4px;" }, r.clearingSupply ? (+r.clearingSupply).toFixed(4) : "—"));
+      tr.appendChild(el("td", { style: "padding:4px;" }, String(r.totalBids ?? "—")));
+      tr.appendChild(el("td", { style: "padding:4px;" }, String(r.totalAsks ?? "—")));
+      tr.appendChild(el("td", { style: "padding:4px;" }, String(r.matchedOrders ?? "—")));
+      tr.appendChild(el("td", { style: "padding:4px;white-space:nowrap;" }, fmtDT(r.clearedAt)));
+      tbody.appendChild(tr);
+    });
+    table.append(thead, tbody);
+    wrap.appendChild(table);
+  } catch (e) {
+    wrap.textContent = `Помилка: ${e?.message || "невідома"}`;
+  }
 }
 
 async function loadParticipants(auctionId, host) {
@@ -623,6 +725,99 @@ async function render() {
   auctionsSec.append(aWrap);
   collapsible(auctionsSec, "auctions");
   root.appendChild(auctionsSec);
+  const pendingSec = el("section", { className: "dashboard-card" });
+  pendingSec.append(
+    el(
+      "div",
+      { className: "section-heading" },
+      el("span", { className: "eyebrow" }, "Заявки"),
+      el("h2", { className: "section-heading__title" }, "Очікують підтвердження"),
+    ),
+  );
+  const pendingControls = el("div", { className: "inline-form", style: "display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:8px;" });
+  const kInput = el("input", { className: "form__input", type: "number", min: "0", max: "1", step: "0.01", value: "0.5", style: "width:80px;", title: "k для пакетного схвалення" });
+  const reasonInput = el("input", { className: "form__input", type: "text", placeholder: "Причина відхилення (опц)", style: "flex:1;min-width:160px;" });
+  const btnRefreshPending = el("button", { className: "btn btn-ghost btn-compact", type: "button" }, "Оновити");
+  const btnApproveSel = el("button", { className: "btn btn-primary btn-compact", type: "button" }, "Схвалити вибрані");
+  const btnRejectSel = el("button", { className: "btn btn-danger btn-compact", type: "button" }, "Відхилити вибрані");
+  pendingControls.append(
+    el("label", { style: "display:flex;flex-direction:column;gap:4px;width:90px;" }, el("span", { className: "form-field__label" }, "k"), kInput),
+    el("label", { style: "display:flex;flex-direction:column;gap:4px;flex:1;" }, el("span", { className: "form-field__label" }, "Причина"), reasonInput),
+    btnApproveSel,
+    btnRejectSel,
+    btnRefreshPending,
+  );
+  const pendingWrap = el("div", { className: "scroll-panel", style: "max-height:260px;overflow:auto;border:1px solid var(--surface-border-soft);border-radius:8px;" });
+  pendingSec.append(pendingControls, pendingWrap);
+  async function loadPending() {
+    pendingWrap.textContent = "Завантаження…";
+    S.pendingSelected.clear();
+    try {
+      const res = await listPendingAuctionOrders();
+      S.pendingOrders = res.orders || [];
+      if (!S.pendingOrders.length) {
+        pendingWrap.textContent = "Немає";
+        return;
+      }
+      const table = el("table", { className: "admin-pending-table", style: "width:100%;font-size:0.68rem;border-collapse:collapse;" });
+      const thead = el("thead", {}, el("tr", {}, ["☑","#","Aукціон","Продукт","Трейдер","Side","Ціна","К-сть","k деф","Створено","Дії"].map(h => el("th", { style: "position:sticky;top:0;background:var(--surface);padding:4px;border-bottom:1px solid var(--surface-border-soft);" }, h))));
+      const tbody = el("tbody");
+      S.pendingOrders.forEach(o => {
+        const tr = el("tr", {});
+        const cb = el("input", { type: "checkbox" });
+        cb.addEventListener("change", () => {
+          if (cb.checked) S.pendingSelected.add(o.id); else S.pendingSelected.delete(o.id);
+        });
+        tr.appendChild(el("td", { style: "padding:4px;" }, cb));
+        tr.appendChild(el("td", { style: "padding:4px;" }, `#${o.auctionId}`));
+        tr.appendChild(el("td", { style: "padding:4px;" }, o.auctionProduct || '-'));
+        tr.appendChild(el("td", { style: "padding:4px;" }, o.traderUsername));
+        tr.appendChild(el("td", { style: "padding:4px;" }, o.side));
+        tr.appendChild(el("td", { style: "padding:4px;" }, (+o.price).toFixed(4)));
+        tr.appendChild(el("td", { style: "padding:4px;" }, (+o.quantity).toFixed(4)));
+        tr.appendChild(el("td", { style: "padding:4px;" }, (+o.auctionDefaultK).toFixed(2)));
+        tr.appendChild(el("td", { style: "padding:4px;white-space:nowrap;" }, fmtDT(o.createdAt)));
+        const actTd = el("td", { style: "padding:4px;display:flex;gap:4px;" });
+        const perK = el("input", { type: "number", min: "0", max: "1", step: "0.01", value: String(o.auctionDefaultK ?? 0.5), style: "width:60px;" });
+        const btnOk = el("button", { className: "btn btn-primary btn-compact", type: "button" }, "OK");
+        const btnX = el("button", { className: "btn btn-danger btn-compact", type: "button" }, "X");
+        btnOk.addEventListener("click", async () => {
+          const kv = Number(perK.value);
+          if (!(kv >= 0 && kv <= 1)) { showToast("k 0..1", "error"); return; }
+          btnOk.disabled = true; btnX.disabled = true;
+          try { await approveAuctionOrder(o.id, kv); showToast("Схвалено", "success"); await loadPending(); } catch(e) { showToast(e?.message||"Помилка", "error"); } finally { btnOk.disabled=false; btnX.disabled=false; }
+        });
+        btnX.addEventListener("click", async () => {
+          btnOk.disabled = true; btnX.disabled = true;
+          try { await rejectAuctionOrder(o.id, reasonInput.value || undefined); showToast("Відхилено", "success"); await loadPending(); } catch(e) { showToast(e?.message||"Помилка", "error"); } finally { btnOk.disabled=false; btnX.disabled=false; }
+        });
+        actTd.append(perK, btnOk, btnX);
+        tr.appendChild(actTd);
+        tbody.appendChild(tr);
+      });
+      table.append(thead, tbody);
+      pendingWrap.innerHTML = "";
+      pendingWrap.appendChild(table);
+    } catch(e) {
+      pendingWrap.textContent = "Помилка";
+    }
+  }
+  btnRefreshPending.addEventListener("click", loadPending);
+  btnApproveSel.addEventListener("click", async () => {
+    if (!S.pendingSelected.size) { showToast("Нічого не вибрано", "error"); return; }
+    const kv = Number(kInput.value);
+    if (!(kv >= 0 && kv <= 1)) { showToast("k 0..1", "error"); return; }
+    btnApproveSel.disabled = true;
+    try { await batchApproveAuctionOrders([...S.pendingSelected], kv); showToast("Пакет схвалено", "success"); await loadPending(); } catch(e) { showToast(e?.message||"Помилка", "error"); } finally { btnApproveSel.disabled=false; }
+  });
+  btnRejectSel.addEventListener("click", async () => {
+    if (!S.pendingSelected.size) { showToast("Нічого не вибрано", "error"); return; }
+    btnRejectSel.disabled = true;
+    try { await batchRejectAuctionOrders([...S.pendingSelected], reasonInput.value || undefined); showToast("Пакет відхилено", "success"); await loadPending(); } catch(e) { showToast(e?.message||"Помилка", "error"); } finally { btnRejectSel.disabled=false; }
+  });
+  collapsible(pendingSec, "pending");
+  root.appendChild(pendingSec);
+  await loadPending();
   const team = el("section", { className: "dashboard-card" });
   team.append(
     el(
@@ -839,6 +1034,125 @@ async function render() {
   });
   create.append(form);
   collapsible(create, "create");
+
+  // СЕКЦІЯ: Аукціони на модерації
+  const moderationSection = el("section", { className: "admin-section" });
+  const moderationHeader = el("h2", {}, "Аукціони на модерації");
+  moderationSection.appendChild(moderationHeader);
+
+  const moderationList = el("div", { id: "moderation-list", className: "moderation-container" });
+  moderationSection.appendChild(moderationList);
+
+  async function loadPendingAuctions() {
+    try {
+      moderationList.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Завантаження...</p></div>';
+      const pending = await getPendingAuctions();
+
+      if (!pending || pending.length === 0) {
+        moderationList.innerHTML = '<div class="empty-state"><div class="empty-state-icon">✅</div><p class="empty-state-text">Немає аукціонів на модерації</p></div>';
+        return;
+      }
+
+      moderationList.innerHTML = '';
+      pending.forEach(auction => {
+        const card = el("article", { className: "user-auction-card", style: "margin-bottom: 1rem;" });
+
+        const header = el("div", { style: "display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem;" });
+        
+        const titleSection = el("div", { style: "flex: 1;" });
+        const title = el("h4", { style: "margin: 0 0 0.5rem 0; font-size: 1.1rem;" }, `#${auction.id} ${auction.product}`);
+        
+        const badges = el("div", { style: "display: flex; gap: 0.5rem; flex-wrap: wrap;" });
+        badges.append(
+          el("span", { className: "chip chip--info" }, auction.type),
+          el("span", { className: "chip" }, `k=${auction.k_value}`),
+          el("span", { className: "chip chip--warning" }, "⏳ pending")
+        );
+        
+        titleSection.append(title, badges);
+        header.appendChild(titleSection);
+
+        const meta = el("div", { style: "font-size: 0.9rem; color: rgba(255, 255, 255, 0.7); margin: 0.75rem 0; display: flex; gap: 1rem; flex-wrap: wrap;" });
+        const creatorBadge = el("span", { className: "pill-author" }, `👤 ${auction.creator_username || 'N/A'}`);
+        const createdDate = el("span", {}, `📅 ${fmtDT(auction.created_at)}`);
+        meta.append(creatorBadge, createdDate);
+        
+        if (auction.window_start || auction.window_end) {
+          const windowDiv = el("div", { style: "margin: 0.5rem 0; font-size: 0.85rem; color: rgba(255, 255, 255, 0.6);" });
+          windowDiv.innerHTML = `<div>⏰ Вікно: ${fmtDT(auction.window_start)} — ${fmtDT(auction.window_end)}</div>`;
+          meta.appendChild(windowDiv);
+        }
+
+        const noteInput = el("input", {
+          type: "text",
+          placeholder: "Примітка (опціонально)",
+          className: "form__input",
+          style: "margin: 0.75rem 0; width: 100%; padding: 0.5rem; border-radius: 4px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1);"
+        });
+
+        const actions = el("div", { style: "display: flex; gap: 0.5rem; margin-top: 1rem;" });
+
+        const btnApprove = el("button", {
+          className: "btn btn-primary btn-compact",
+          style: "flex: 1;"
+        }, "✓ Схвалити");
+
+        const btnReject = el("button", {
+          className: "btn btn-danger btn-compact",
+          style: "flex: 1;"
+        }, "✗ Відхилити");
+
+        btnApprove.addEventListener("click", async () => {
+          if (!confirm(`Схвалити аукціон #${auction.id}?`)) return;
+          try {
+            await approveAuction(auction.id, noteInput.value.trim() || null);
+            showToast("Аукціон схвалено", "success");
+            await loadPendingAuctions();
+            await render();
+          } catch (err) {
+            showToast(err?.message || "Помилка", "error");
+          }
+        });
+
+        btnReject.addEventListener("click", async () => {
+          const note = noteInput.value.trim();
+          if (!note) {
+            showToast("Вкажіть причину відхилення", "error");
+            return;
+          }
+          if (!confirm(`Відхилити аукціон #${auction.id}?`)) return;
+          try {
+            await rejectAuction(auction.id, note);
+            showToast("Аукціон відхилено", "success");
+            await loadPendingAuctions();
+            await render();
+          } catch (err) {
+            showToast(err?.message || "Помилка", "error");
+          }
+        });
+
+        actions.append(btnApprove, btnReject);
+        card.append(header, meta, noteInput, actions);
+        moderationList.appendChild(card);
+      });
+
+    } catch (err) {
+      console.error("Load pending auctions error:", err);
+      moderationList.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">❌</div>
+          <p class="empty-state-text" style="color: var(--error-color);">${err?.message || 'Помилка завантаження'}</p>
+          <button type="button" class="btn btn-primary btn-compact" onclick="location.reload()">Перезавантажити</button>
+        </div>
+      `;
+    }
+  }
+
+  await loadPendingAuctions();
+  collapsible(moderationSection, "moderation");
+  moderationSection.id = "moderation";
+  root.appendChild(moderationSection);
+
   root.appendChild(create);
   updateActiveNav();
 }

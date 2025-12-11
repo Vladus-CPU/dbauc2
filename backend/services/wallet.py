@@ -1,8 +1,8 @@
 import json
 from decimal import Decimal
 from typing import Optional, Tuple
-from ..errors import AppError, OrderDataError
-from ..db import ensure_wallet_tables
+from backend.errors import AppError, OrderDataError
+from backend.db import ensure_wallet_tables
 
 def _ensure_wallet_row(conn, user_id: int):
     ensure_wallet_tables(conn)

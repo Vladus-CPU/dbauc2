@@ -16,6 +16,7 @@ const metricsEl = document.getElementById('market-metrics');
 const formsEl = document.getElementById('market-forms');
 const refreshBtn = document.getElementById('refresh-book');
 const myOrdersListEl = document.getElementById('my-orders-list');
+const clearingRoundsListEl = document.getElementById('clearing-rounds-list');
 const historyChartsEl = document.getElementById('history-charts');
 const priceDistEl = document.getElementById('price-distribution');
 const recentOrdersEl = document.getElementById('recent-orders');
@@ -95,14 +96,30 @@ function localizeErrorMessage(msg) {
 
 function renderSummary(book, me) {
   const { auction } = book;
-  titleEl.textContent = `${auction.product}`;
+  let authorBadge = '';
+  if (me?.authenticated && auction?.creator_id && me.user?.id === auction.creator_id) {
+    authorBadge = '<span class="pill pill-author" style="margin-left:8px;">Автор</span>';
+  }
+  titleEl.innerHTML = `${auction.product} ${authorBadge}`;
   statusEl.textContent = tStatus(auction.status);
   statusEl.className = `pill status-${auction.status}`;
   document.title = `${auction.product} · Книга заявок аукціону`;
 
   const meta = [];
+  if (auction.approval_status && auction.approval_status !== 'approved') {
+    meta.push(`<span><strong>Статус модерації:</strong> ${auction.approval_status}</span>`);
+  }
   meta.push(`<span><strong>Тип:</strong> ${auction.type}</span>`);
   meta.push(`<span><strong>k:</strong> ${formatNumber(auction.k_value, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span>`);
+  
+  // Додаємо інформацію про раунди
+  if (auction.current_round !== undefined && auction.current_round !== null) {
+    meta.push(`<span><strong>Поточний раунд:</strong> ${auction.current_round}</span>`);
+  }
+  
+  // Завжди додаємо елемент таймера - його будуть оновлювати потім
+  meta.push(`<span id="next-clearing-timer"><strong>⏱ Наступний кліринг:</strong> <span id="clearing-time">—</span></span>`);
+  
   if (auction.window_start) {
     meta.push(`<span><strong>Початок:</strong> ${formatDate(auction.window_start)}</span>`);
   }
@@ -551,6 +568,74 @@ function renderClearing(book) {
   renderClearingChart(data);
 }
 
+async function renderClearingRounds() {
+  if (!clearingRoundsListEl) return;
+  clearingRoundsListEl.innerHTML = '<p class="muted" style="padding:16px;">Завантаження…</p>';
+  try {
+    // Завантажуємо раунди через публічний endpoint
+    const response = await authorizedFetch(`/api/auctions/${auctionId}/clearing-history`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const historyResp = await response.json();
+    const rounds = historyResp.rounds || [];
+    
+    // Отримуємо інформацію про наступний кліринг з поточної книги
+    let nextClearingInfo = '';
+    if (window.__lastBook?.auction?.next_clearing_at) {
+      const nextClearing = new Date(window.__lastBook.auction.next_clearing_at);
+      const now = new Date();
+      if (nextClearing > now) {
+        nextClearingInfo = `<div style="padding:12px;background:var(--surface);border-radius:6px;margin-bottom:12px;border-left:4px solid #66c0f4;">
+          <strong>⏱ Наступний кліринг:</strong> <span id="next-clearing-countdown">${formatDate(nextClearing)}</span>
+        </div>`;
+      }
+    }
+    
+    if (!rounds.length) {
+      clearingRoundsListEl.innerHTML = nextClearingInfo + '<p class="muted" style="padding:16px;">Клірингу ще не було</p>';
+      return;
+    }
+    
+    const html = nextClearingInfo + `
+      <div style="overflow-x:auto;">
+        <table style="width:100%;font-size:0.85rem;border-collapse:collapse;">
+          <thead>
+            <tr style="background:var(--surface);border-bottom:1px solid var(--surface-border-soft);">
+              <th style="padding:8px;text-align:left;">Раунд</th>
+              <th style="padding:8px;text-align:right;">Clearing ціна</th>
+              <th style="padding:8px;text-align:right;">Обсяг</th>
+              <th style="padding:8px;text-align:right;">Попит</th>
+              <th style="padding:8px;text-align:right;">Пропозиція</th>
+              <th style="padding:8px;text-align:right;">Виконано ордерів</th>
+              <th style="padding:8px;text-align:right;">Час клірингу</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rounds.map((r, idx) => `
+              <tr style="border-bottom:1px solid var(--surface-border-soft);">
+                <td style="padding:8px;"><strong>#${r.roundNumber}</strong></td>
+                <td style="padding:8px;text-align:right;color:#66c0f4;"><strong>${formatPrice(r.clearingPrice)}</strong></td>
+                <td style="padding:8px;text-align:right;">${formatQty(r.clearingVolume)}</td>
+                <td style="padding:8px;text-align:right;color:#7ee787;">${formatQty(r.clearingDemand)}</td>
+                <td style="padding:8px;text-align:right;color:#ff9393;">${formatQty(r.clearingSupply)}</td>
+                <td style="padding:8px;text-align:right;"><span style="background:var(--surface);padding:2px 6px;border-radius:3px;">${r.matchedOrders}</span></td>
+                <td style="padding:8px;white-space:nowrap;font-size:0.8rem;color:var(--text-muted);">${formatDate(r.clearedAt)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    clearingRoundsListEl.innerHTML = html;
+  } catch (err) {
+    console.warn('Не вдалося завантажити раунди клірингу:', err);
+    if (clearingRoundsListEl) {
+      clearingRoundsListEl.innerHTML = `<p class="muted" style="padding:16px;">❌ ${err?.message || 'Помилка завантаження'}</p>`;
+    }
+  }
+}
+
 function renderClearingChart(data) {
   clearingChartEl.innerHTML = '';
   if (!data || data.length < 2) {
@@ -784,6 +869,7 @@ async function refreshAll() {
     if (window.__lastBook) {
       try { renderOrdersList(window.__lastBook); } catch {}
       try { renderClearing(window.__lastBook); } catch {}
+      try { renderClearingRounds(); } catch {}
     }
   } else if (__activeTab === 'tab-distribution') {
     await updatePriceDistribution(false, seq);
@@ -844,6 +930,30 @@ async function renderMyOrdersTab(me) {
   myOrdersListEl.appendChild(list);
 }
 
+// Функція для оновлення таймера кліренгу без повного перезавантаження
+function updateClearingTimer() {
+  const clearingTimeEl = document.getElementById('clearing-time');
+  if (!clearingTimeEl || !window.__lastBook?.auction?.next_clearing_at) return;
+  
+  const nextClearingAt = window.__lastBook.auction.next_clearing_at;
+  const nextClearing = new Date(nextClearingAt);
+  const now = new Date();
+  
+  console.log(`[Timer] nextClearingAt=${nextClearingAt}, now=${now.toISOString()}, diff=${nextClearing - now}ms`);
+  
+  if (nextClearing <= now) {
+    clearingTimeEl.textContent = 'виконується...';
+    return;
+  }
+  
+  const diffMs = nextClearing - now;
+  const diffMinutes = Math.floor(diffMs / 60000);
+  const diffSeconds = Math.floor((diffMs % 60000) / 1000);
+  const timeStr = `через ${diffMinutes}хв ${diffSeconds}с`;
+  
+  clearingTimeEl.textContent = timeStr;
+}
+
 refreshBtn.addEventListener('click', () => { refreshAll().then(()=> showToast('Оновлено', 'info')); });
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -856,6 +966,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       refreshAll();
     }, FULL_REFRESH_INTERVAL);
   }
+  
+  // Оновлюємо таймер кожну секунду
+  setInterval(() => {
+    if (!document.hidden) {
+      updateClearingTimer();
+    }
+  }, 1000);
   window.addEventListener('beforeunload', () => {
     if (__refreshTimer) {
       clearInterval(__refreshTimer);
@@ -876,11 +993,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (panel) panel.classList.add('is-active');
       __activeTab = id;
       if (id === 'tab-my-orders') { renderMyOrdersTab(window.__lastMe); }
+      if (id === 'tab-rounds') { renderClearingRounds(); }
       if (id === 'tab-activity') {
         updateHistoryCharts(true, __refreshSeq);
         if (window.__lastBook) {
           try { renderOrdersList(window.__lastBook); } catch {}
           try { renderClearing(window.__lastBook); } catch {}
+          try { renderClearingRounds(); } catch {}
         }
       }
       if (id === 'tab-distribution') {

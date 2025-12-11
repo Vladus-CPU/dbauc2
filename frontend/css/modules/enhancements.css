@@ -1,0 +1,606 @@
+/* Глобальні card стилі */
+.card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 1.5rem;
+    transition: all 0.2s ease;
+}
+
+.card:hover {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.card--elevated {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.card--elevated:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px);
+}
+
+/* Секція заявок користувачів */
+.user-auctions-section {
+    margin-bottom: 2rem;
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.user-auctions-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.user-auctions-header__left {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.user-auctions-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.btn-group {
+    display: flex;
+    gap: 0.5rem;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.btn-compact {
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+}
+
+.user-auctions-list {
+    padding: 1.5rem;
+    min-height: 200px;
+}
+
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 2rem;
+    color: var(--text-muted, rgba(255, 255, 255, 0.6));
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-top-color: var(--primary, #4CAF50);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.user-auction-card {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: rgba(255, 255, 255, 0.02);
+    transition: all 0.2s ease;
+    animation: fadeInUp 0.3s ease;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.user-auction-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.pill-author {
+    background: rgba(33, 150, 243, 0.2);
+    color: #64B5F6;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 1px solid rgba(33, 150, 243, 0.3);
+    transition: all 0.2s ease;
+}
+
+.chip {
+    background: rgba(76, 175, 80, 0.2);
+    color: #81C784;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    transition: all 0.2s ease;
+}
+
+.chip--success {
+    background: rgba(76, 175, 80, 0.2);
+    color: #81C784;
+    border-color: rgba(76, 175, 80, 0.3);
+}
+
+.chip--warning {
+    background: rgba(255, 152, 0, 0.2);
+    color: #FFB74D;
+    border: 1px solid rgba(255, 152, 0, 0.3);
+}
+
+.chip--danger {
+    background: rgba(244, 67, 54, 0.2);
+    color: #E57373;
+    border: 1px solid rgba(244, 67, 54, 0.3);
+}
+
+.chip--info {
+    background: rgba(33, 150, 243, 0.2);
+    color: #64B5F6;
+    border: 1px solid rgba(33, 150, 243, 0.3);
+}
+
+/* Badge варіанти */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge--primary {
+    background: rgba(76, 175, 80, 0.2);
+    color: #81C784;
+    border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.badge--secondary {
+    background: rgba(158, 158, 158, 0.2);
+    color: #BDBDBD;
+    border: 1px solid rgba(158, 158, 158, 0.3);
+}
+
+.badge--outline {
+    background: transparent;
+    border: 1px solid currentColor;
+}
+
+/* Покращені кнопки */
+.btn {
+    transition: all 0.2s ease;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.btn-compact {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #45a049 0%, #3d8b40 100%);
+}
+
+.btn-ghost {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.btn-ghost:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: white;
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+    color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: linear-gradient(135deg, #d32f2f 0%, #c62828 100%);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Form inputs */
+.form__input {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    padding: 0.5rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.form__input:focus {
+    outline: none;
+    border-color: rgba(76, 175, 80, 0.5);
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+}
+
+.form__input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* Responsive дизайн */
+@media (max-width: 768px) {
+    .user-auctions-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .user-auctions-header__left {
+        width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .btn-group {
+        width: 100%;
+    }
+    
+    .card {
+        padding: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .user-auction-card {
+        padding: 0.75rem;
+    }
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted, rgba(255, 255, 255, 0.6));
+}
+
+.empty-state-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.empty-state-text {
+    font-size: 1rem;
+    margin: 0;
+}
+
+/* Заголовки секцій */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.section-header h2,
+.section-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.section-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+/* Хлібні крихти */
+nav[aria-label="Breadcrumb"] {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0.75rem 1.5rem;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.7);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+nav[aria-label="Breadcrumb"] a {
+    color: rgba(255, 255, 255, 0.8);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+}
+
+nav[aria-label="Breadcrumb"] a:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+nav[aria-label="Breadcrumb"] span {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+nav[aria-label="Breadcrumb"] strong {
+    color: #fff;
+    font-weight: 600;
+}
+
+/* Покращені статистичні плитки */
+.inventory-stat {
+    position: relative;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.inventory-stat:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.inventory-stat[title] {
+    cursor: help;
+}
+
+/* Підсвічування для важливих статистик */
+.inventory-stat.stat-warning {
+    animation: pulse-warning 2s ease-in-out infinite;
+}
+
+@keyframes pulse-warning {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(255, 193, 7, 0); }
+}
+
+/* Покращені чіпси статусів */
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    background: var(--surface-secondary, #e9ecef);
+    color: var(--text, #333);
+    transition: all 0.2s ease;
+}
+
+.chip--accent {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.chip--success {
+    background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+    color: #155724;
+}
+
+.chip--warning {
+    background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+    color: #856404;
+}
+
+.chip--danger {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+    color: white;
+}
+
+/* Покращені кнопки з іконками */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+/* Анімація завантаження */
+.is-loading {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.is-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid rgba(0, 0, 0, 0.1);
+    border-top-color: var(--primary, #007bff);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Покращені повідомлення (notices) */
+.notice {
+    border-left: 4px solid var(--primary, #007bff);
+    transition: all 0.3s ease;
+}
+
+.notice:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.notice--internal {
+    border-left-color: #6c757d;
+}
+
+/* Таймер раундів */
+#next-clearing-timer {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 8px;
+    font-weight: 600;
+    animation: timer-pulse 1s ease-in-out infinite;
+}
+
+@keyframes timer-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
+
+/* Покращена таблиця заявок */
+.admin-pending-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.85rem;
+}
+
+.admin-pending-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface, #fff);
+    padding: 0.75rem;
+    border-bottom: 2px solid var(--border-color, #e0e0e0);
+    font-weight: 600;
+    text-align: left;
+    z-index: 10;
+}
+
+.admin-pending-table tbody tr {
+    transition: background-color 0.2s ease;
+}
+
+.admin-pending-table tbody tr:hover {
+    background: var(--surface-secondary, #f8f9fa);
+}
+
+.admin-pending-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-color, #e9ecef);
+}
+
+/* Чекбокси */
+input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--primary, #007bff);
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    nav[aria-label="Breadcrumb"] {
+        padding: 0.75rem 1rem;
+        font-size: 0.8rem;
+    }
+    
+    .inventory-stat {
+        min-width: 100%;
+    }
+    
+    .chip {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+    }
+}
+
+/* Tooltip стилі */
+[title] {
+    position: relative;
+}
+
+/* Smooth scroll для навігації */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Покращені відступи */
+.inventory-page {
+    padding-top: 0;
+}
+
+/* Анімація появи елементів */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card, .dashboard-card, .stack-card {
+    animation: fadeIn 0.3s ease-out;
+}

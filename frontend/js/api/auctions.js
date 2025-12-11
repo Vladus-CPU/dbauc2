@@ -86,6 +86,19 @@ export async function cleanupAuctionBots(auctionId, options = {}) {
     return res.json();
 }
 
+export async function createUserAuction({ product, type = 'open', k = 0.5, windowStart, windowEnd }) {
+    const res = await authorizedFetch('/api/auctions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product, type, k, windowStart, windowEnd })
+    });
+    if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`Не вдалося створити аукціон: ${res.status} ${txt}`);
+    }
+    return res.json();
+}
+
 export async function purgeAllBots(options = {}) {
     const res = await authorizedFetch(`/api/admin/bots/purge`, {
         method: 'POST',

@@ -229,6 +229,31 @@ a:focus-visible {
     color: #caffda;
 }
 
+/* Auction approval status chips */
+.chip--success {
+    border-color: rgba(74, 222, 128, 0.55);
+    background: rgba(74, 222, 128, 0.24);
+    color: #d9ffe9;
+    box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.3);
+}
+.chip--danger {
+    border-color: rgba(255, 120, 120, 0.55);
+    background: rgba(255, 120, 120, 0.20);
+    color: #ffd6d6;
+    box-shadow: 0 0 0 1px rgba(255, 120, 120, 0.28);
+}
+.chip--warning {
+    border-color: rgba(255, 200, 92, 0.55);
+    background: rgba(255, 200, 92, 0.20);
+    color: #ffe9c2;
+    box-shadow: 0 0 0 1px rgba(255, 200, 92, 0.26);
+}
+.pill-author {
+    background: rgba(74, 222, 128, 0.16);
+    color: #bdf3d3;
+    border: 1px solid rgba(74, 222, 128, 0.4);
+}
+
 .tabs {
     display: flex;
     gap: 10px;

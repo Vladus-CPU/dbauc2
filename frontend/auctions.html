@@ -17,9 +17,8 @@
       </div>
       <nav>
         <a href="index.html" class="nav-link">Головна</a>
-        <a href="listing.html" class="nav-link nav-link--internal" data-role-required="admin">
-          <span>Інвентар</span>
-          <span class="badge badge--outline">ВНУТРІШНЄ</span>
+        <a href="listing.html" class="nav-link nav-link--internal" data-role-required="admin" title="Керування каталогом лотів та створення аукціонів">
+          <span>📦 Каталог</span>
         </a>
         <a href="auctions.html" class="nav-link active">Аукціони</a>
         <a href="wallet.html" class="nav-link" data-role-required="auth">Гаманець</a>
@@ -35,8 +34,12 @@
           <p class="section-heading__meta">
             Слідкуйте за вікнами збору заявок, переглядайте книгу ордерів та подавайте власні заявки у кілька кліків.
           </p>
+          <a href="create-auction.html" class="btn btn--primary" data-role-required="auth" style="margin-left: 10px;">
+            + Створити новий аукціон
+          </a>
         </div>
-        <div class="hero-actions" id="auction-session-cta"></div>
+        <div class="hero-actions" id="auction-session-cta">
+        </div>
       </section>
       <section class="dashboard-card dashboard-card--toolbar" aria-label="Панель фільтрів">
         <form id="auction-filters" class="auction-filters" autocomplete="off">

@@ -18,9 +18,8 @@
             </div>
             <nav aria-label="Main navigation">
                 <a href="index.html" class="nav-link">Головна</a>
-                <a href="listing.html" class="nav-link nav-link--internal active" data-role-required="admin">
-                    <span>Інвентар</span>
-                    <span class="badge badge--outline">ВНУТРІШНЄ</span>
+                <a href="listing.html" class="nav-link nav-link--internal active" data-role-required="admin" title="Керування каталогом лотів та створення аукціонів">
+                    <span>📦 Каталог</span>
                 </a>
                 <a href="auctions.html" class="nav-link">Аукціони</a>
                 <a href="wallet.html" class="nav-link" data-role-required="auth">Гаманець</a>
@@ -29,26 +28,31 @@
             </nav>
         </header>
         <main class="inventory-page">
+            
             <section class="notice notice--internal" role="note" aria-live="polite">
-                <div class="badge badge--outline">ВНУТРІШНІЙ ІНСТРУМЕНТ</div>
+                <div class="badge badge--outline">АДМІН ІНСТРУМЕНТ</div>
                 <div>
-                    <h2 class="notice__title">Консоль лотів</h2>
-                    <p class="notice__body">Ця сторінка призначена для того, щоб швидко завантажувати або тестувати лоти.</p>
+                    <h2 class="notice__title">📦 Каталог лотів</h2>
+                    <p class="notice__body">Керуйте каталогом товарів, створюйте та запускайте аукціони, модеруйте заявки користувачів.</p>
                 </div>
             </section>
             <section class="inventory-overview">
                 <div class="inventory-stats" id="inventory-stats">
-                    <article class="inventory-stat">
-                        <span class="inventory-stat__label">Опубліковані</span>
+                    <article class="inventory-stat" title="Лоти доступні для створення аукціонів">
+                        <span class="inventory-stat__label">✅ Опубліковані</span>
                         <span class="inventory-stat__value" id="stat-published">0</span>
                     </article>
-                    <article class="inventory-stat">
-                        <span class="inventory-stat__label">Чернетки</span>
+                    <article class="inventory-stat" title="Лоти в процесі підготовки">
+                        <span class="inventory-stat__label">📝 Чернетки</span>
                         <span class="inventory-stat__value" id="stat-draft">0</span>
                     </article>
-                    <article class="inventory-stat">
-                        <span class="inventory-stat__label">Архів</span>
+                    <article class="inventory-stat" title="Історичні або неактуальні лоти">
+                        <span class="inventory-stat__label">📁 Архів</span>
                         <span class="inventory-stat__value" id="stat-archived">0</span>
+                    </article>
+                    <article class="inventory-stat stat-warning" title="Аукціони користувачів очікують схвалення" style="background: #fff3cd; border-left: 4px solid #ffc107;">
+                        <span class="inventory-stat__label">⏳ Очікують модерації</span>
+                        <span class="inventory-stat__value" id="stat-pending" style="color: #ff9800; font-weight: bold;">0</span>
                     </article>
                 </div>
                 <ol class="inventory-steps" aria-label="Рекомендований порядок дій">
@@ -110,6 +114,27 @@
                             <button type="button" class="btn btn-ghost btn-compact" id="refresh-listings">Оновити</button>
                         </div>
                     </header>
+
+                    <!-- User-submitted auctions section -->
+                    <div id="user-auctions-section" class="user-auctions-section">
+                        <header class="user-auctions-header">
+                            <div class="user-auctions-header__left">
+                                <h3>📤 Заявки користувачів</h3>
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-primary btn-compact" id="show-pending-auctions">🕒 На модерації</button>
+                                    <button type="button" class="btn btn-ghost btn-compact" id="show-approved-auctions">✅ Схвалені</button>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-ghost btn-compact" id="toggle-user-auctions">▼ Приховати</button>
+                        </header>
+                        <div id="user-auctions-list" class="user-auctions-list">
+                            <div class="loading-state">
+                                <div class="spinner"></div>
+                                <p>Завантаження заявок...</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="inventory-table-wrapper">
                         <table class="inventory-table">
                             <thead>
@@ -220,6 +245,6 @@
                 </aside>
             </div>
         </main>
-        <script type="module" src="js/pages/listings.js"></script>
+        <script type="module" src="js/pages/listings.js?v=3"></script>
     </body>
 </html>

@@ -29,3 +29,9 @@ export async function meInventory() {
     if (!res.ok) throw new Error(`Мій інвентар не вдалось отримати: ${res.status}`);
     return res.json();
 }
+
+export async function meClearingInsights() {
+    const res = await authorizedFetch('/api/me/clearing-insights');
+    if (!res.ok) throw new Error(`Не вдалося отримати дані клірингу: ${res.status}`);
+    return res.json();
+}
