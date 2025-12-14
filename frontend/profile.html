@@ -29,6 +29,12 @@
     <main class="container">
       <section class="dashboard-card dashboard-card--header">
         <div id="profile-head">Завантаження...</div>
+        <div id="profile-actions" style="
+          display: flex;
+          gap: 12px;
+          margin-top: 16px;
+          flex-wrap: wrap;
+        "></div>
       </section>
       <section class="dashboard-card">
         <div class="section-heading">
@@ -48,7 +54,25 @@
         </div>
         <div id="profile-content" class="tab-panel"></div>
       </section>
+
+      <section class="dashboard-card">
+        <div class="section-heading">
+          <span class="eyebrow">Інвентар</span>
+          <h2 class="section-heading__title">Отримані ресурси</h2>
+          <p class="section-heading__meta">Зведення по товарах, що були зараховані після клірингу.</p>
+        </div>
+        <div id="inventory-content"></div>
+      </section>
+
+      <section class="dashboard-card">
+        <div class="section-heading">
+          <span class="eyebrow">Кліринг</span>
+          <h2 class="section-heading__title">Результати після клірингу</h2>
+          <p class="section-heading__meta">Останній раунд, виконані ордери та події інвентарю.</p>
+        </div>
+        <div id="clearing-content"></div>
+      </section>
     </main>
-    <script type="module" src="js/pages/profile.js?v=2"></script>
+    <script type="module" src="js/pages/profile.js?v=6"></script>
   </body>
   </html>

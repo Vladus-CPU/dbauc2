@@ -232,109 +232,239 @@ async function renderAuth(container) {
 }
 
 async function renderMyAuctions(root) {
-	root.innerHTML = '';
-	const list = el('div', { className: 'stack-grid' });
-	list.textContent = 'Завантаження аукціонів…';
-	root.appendChild(list);
+	console.log('[renderMyAuctions] called, root:', root);
+	if (!root) {
+		console.error('[renderMyAuctions] root is null/undefined');
+		return;
+	}
+	root.innerHTML = '<div style="padding: 16px; text-align: center; color: rgba(255,255,255,0.7);">⏳ Завантаження аукціонів...</div>';
+	
 	try {
+		console.log('[renderMyAuctions] calling meAuctions...');
 		const rows = await meAuctions();
-		if (!rows.length) { list.textContent = 'Ще немає участі в аукціонах'; return; }
-		list.innerHTML = '';
-		rows.forEach((r) => {
-			const card = el('article', { className: 'stack-card' });
-			const header = el('div', { className: 'stack-card__header' },
-				el('strong', {}, `#${r.auction_id} ${r.product}`),
-				el('span', { className: 'pill pill--outline' }, r.auction_type),
-				el('span', { className: 'chip' }, `k = ${r.k_value}`),
-				el('span', { className: 'chip' }, `Auction • ${r.auction_status}`)
-			);
-			const meta = el('div', { className: 'stack-card__meta' }, `Ви • ${r.participant_status} @ ${new Date(r.joined_at).toLocaleString()}`);
-			card.append(header, meta);
-			list.appendChild(card);
+		console.log('[renderMyAuctions] meAuctions returned:', rows);
+		if (!rows || !rows.length) { 
+			root.innerHTML = `
+				<div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.6);">
+					<div style="font-size: 48px; margin-bottom: 16px;">📋</div>
+					<h3 style="margin: 0 0 8px 0; color: #fff;">Немає аукціонів</h3>
+					<p style="margin: 0; font-size: 0.95em;">Ви ще не брали участь в жодному аукціоні</p>
+				</div>
+			`;
+			return; 
+		}
+		
+		let html = `
+			<div style="overflow-x: auto;">
+				<table style="width: 100%; border-collapse: collapse; background: rgba(20,20,30,0.5); border-radius: 8px; overflow: hidden;">
+					<thead>
+						<tr style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); color: white;">
+							<th style="padding: 12px; text-align: left; font-weight: 600;">ID</th>
+							<th style="padding: 12px; text-align: left; font-weight: 600;">Продукт</th>
+							<th style="padding: 12px; text-align: left; font-weight: 600;">Тип</th>
+							<th style="padding: 12px; text-align: left; font-weight: 600;">Статус</th>
+							<th style="padding: 12px; text-align: left; font-weight: 600;">Роль</th>
+							<th style="padding: 12px; text-align: left; font-weight: 600;">Дії</th>
+						</tr>
+					</thead>
+					<tbody>
+		`;
+		
+		rows.forEach((r, idx) => {
+			const auctionType = r.auction_type === 'buy' ? '🛒 Купівля' : '💰 Продаж';
+			const statusMap = { 'pending': '⏳ Очікує', 'active': '🟢 Активний', 'closed': '🔴 Закритий' };
+			const statusColorMap = { 'pending': '#ff9500', 'active': '#4ade80', 'closed': '#888' };
+			const status = statusMap[r.auction_status] || r.auction_status;
+			const statusColor = statusColorMap[r.auction_status] || '#888';
+			const role = r.is_creator ? '👑 Створив' : '👤 Учасник';
+			const bgColor = idx % 2 === 0 ? 'rgba(40,40,50,0.3)' : 'rgba(30,30,40,0.3)';
+			
+			html += `
+				<tr style="background: ${bgColor};">
+					<td style="padding: 12px; color: #fff;"><strong>#${r.auction_id}</strong></td>
+					<td style="padding: 12px; color: #fff;">${r.product || '—'}</td>
+					<td style="padding: 12px; color: #fff;">${auctionType}</td>
+					<td style="padding: 12px;"><span style="color: ${statusColor};">${status}</span></td>
+					<td style="padding: 12px; color: #fff;">${role}</td>
+					<td style="padding: 12px;">
+						<a href="auction.html?id=${r.auction_id}" style="display: inline-block; padding: 6px 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 6px; font-size: 0.85rem;">Відкрити</a>
+					</td>
+				</tr>
+			`;
 		});
-	} catch (_) {
-		list.textContent = 'Не вдалося завантажити';
+		
+		html += '</tbody></table></div>';
+		console.log('[renderMyAuctions] setting innerHTML, html length:', html.length);
+		root.innerHTML = html;
+		console.log('[renderMyAuctions] innerHTML set, root.innerHTML length:', root.innerHTML.length);
+	} catch (err) {
+		console.error('Помилка завантаження аукціонів:', err);
+		root.innerHTML = '<div style="color: #ff8888; padding: 16px; background: rgba(255,136,136,0.1); border-radius: 8px;">❌ Не вдалося завантажити аукціони</div>';
 	}
 }
 
 async function renderMyOrders(root) {
-	root.innerHTML = '';
-	const list = el('div', { className: 'stack-grid' });
-	list.textContent = 'Завантаження ордерів…';
-	root.appendChild(list);
+	if (!root) return;
+	root.innerHTML = '<div style="padding: 16px; text-align: center; color: rgba(255,255,255,0.7);">⏳ Завантаження ордерів...</div>';
+	
 	try {
 		const rows = await meAuctionOrders();
-		if (!rows.length) { list.textContent = 'Ордерів ще немає'; return; }
-		list.innerHTML = '';
-		rows.forEach((o) => {
-			const qty = Number(o.quantity);
-			const cqty = o.cleared_quantity != null ? Number(o.cleared_quantity) : null;
-			const card = el('article', { className: 'stack-card' });
-			const header = el('div', { className: 'stack-card__header' },
-				el('strong', {}, `Аукціон #${o.auction_id}`),
-				el('span', { className: 'pill pill--outline' }, o.side),
-				el('span', { className: 'chip' }, `${o.price} × ${qty}`),
-				o.status ? el('span', { className: 'chip' }, `Статус • ${o.status}`) : null
-			);
-			card.appendChild(header);
-			if (cqty != null) {
-				card.appendChild(el('div', { className: 'stack-card__meta' }, `Відклірено • ${o.cleared_price} × ${cqty}`));
-			}
-			card.appendChild(el('div', { className: 'stack-card__meta' }, `${o.product} • ${new Date(o.created_at).toLocaleString()}`));
-			list.appendChild(card);
+		if (!rows || !rows.length) { 
+			root.innerHTML = `
+				<div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.6);">
+					<div style="font-size: 48px; margin-bottom: 16px;">📝</div>
+					<h3 style="margin: 0 0 8px 0; color: #fff;">Немає ордерів</h3>
+					<p style="margin: 0; font-size: 0.95em;">Ви ще не розмістили жодного ордера</p>
+				</div>
+			`;
+			return; 
+		}
+		
+		let html = `
+			<div style="overflow-x: auto;">
+				<table style="width: 100%; border-collapse: collapse; background: rgba(20,20,30,0.5); border-radius: 8px; overflow: hidden;">
+					<thead>
+						<tr style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); color: white;">
+							<th style="padding: 12px; text-align: left; font-weight: 600;">ID</th>
+							<th style="padding: 12px; text-align: left; font-weight: 600;">Аукціон</th>
+							<th style="padding: 12px; text-align: left; font-weight: 600;">Продукт</th>
+							<th style="padding: 12px; text-align: left; font-weight: 600;">Сторона</th>
+							<th style="padding: 12px; text-align: left; font-weight: 600;">Ціна</th>
+							<th style="padding: 12px; text-align: left; font-weight: 600;">Кількість</th>
+							<th style="padding: 12px; text-align: left; font-weight: 600;">Статус</th>
+							<th style="padding: 12px; text-align: left; font-weight: 600;">Виконано</th>
+						</tr>
+					</thead>
+					<tbody>
+		`;
+		
+		rows.forEach((o, idx) => {
+			const side = o.side === 'buy' ? '🟢 Купити' : '🔴 Продати';
+			const sideColor = o.side === 'buy' ? '#4ade80' : '#f87171';
+			const statusMap = { 'active': '🟡 Активний', 'cleared': '✅ Виконано', 'cancelled': '❌ Скасовано' };
+			const statusColorMap = { 'active': '#facc15', 'cleared': '#4ade80', 'cancelled': '#888' };
+			const status = statusMap[o.status] || o.status;
+			const statusColor = statusColorMap[o.status] || '#888';
+			const bgColor = idx % 2 === 0 ? 'rgba(40,40,50,0.3)' : 'rgba(30,30,40,0.3)';
+			
+			const cleared = o.status === 'cleared' && o.cleared_quantity
+				? `${o.cleared_quantity} шт @ ${parseFloat(o.cleared_price).toFixed(2)} грн`
+				: '—';
+			
+			html += `
+				<tr style="background: ${bgColor};">
+					<td style="padding: 12px; color: #fff;"><strong>#${o.id}</strong></td>
+					<td style="padding: 12px;"><a href="auction.html?id=${o.auction_id}" style="color: #10b981; text-decoration: none;">#${o.auction_id}</a></td>
+					<td style="padding: 12px; color: #fff;">${o.product || '—'}</td>
+					<td style="padding: 12px; color: ${sideColor};">${side}</td>
+					<td style="padding: 12px; color: #fff;">${parseFloat(o.price).toFixed(2)} грн</td>
+					<td style="padding: 12px; color: #fff;">${o.quantity} шт</td>
+					<td style="padding: 12px; color: ${statusColor};">${status}</td>
+					<td style="padding: 12px; color: #fff;">${cleared}</td>
+				</tr>
+			`;
 		});
-	} catch (_) {
-		list.textContent = 'Не вдалося завантажити';
+		
+		html += '</tbody></table></div>';
+		root.innerHTML = html;
+	} catch (err) {
+		console.error('Помилка завантаження ордерів:', err);
+		root.innerHTML = '<div style="color: #ff8888; padding: 16px; background: rgba(255,136,136,0.1); border-radius: 8px;">❌ Не вдалося завантажити ордери</div>';
 	}
 }
 
 async function renderMyDocs(root) {
-	root.innerHTML = '';
-	const list = el('div', { className: 'data-list' });
-	list.textContent = 'Завантаження документів…';
-	root.appendChild(list);
+	if (!root) return;
+	root.innerHTML = '<div style="padding: 16px; text-align: center; color: rgba(255,255,255,0.7);">⏳ Завантаження документів...</div>';
+	
 	try {
 		const rows = await meDocuments();
-		if (!rows.length) { list.textContent = 'Документів ще немає'; return; }
-		list.innerHTML = '';
-		rows.forEach((d) => {
-			const item = el('div', { className: 'data-list__item' },
-				el('span', { className: 'data-list__label' }, `Аукціон #${d.auction_id}`),
-				el('span', { className: 'chip' }, d.filename),
-				d.notes ? el('span', { className: 'chip' }, d.notes) : null,
-				el('span', { className: 'data-list__meta' }, new Date(d.created_at || d.uploaded_at || d.uploadedAt || Date.now()).toLocaleString())
-			);
-			const btn = el('button', { className: 'btn btn-ghost btn-compact' }, 'Завантажити');
+		if (!rows || !rows.length) { 
+			root.innerHTML = `
+				<div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.6);">
+					<div style="font-size: 48px; margin-bottom: 16px;">📄</div>
+					<h3 style="margin: 0 0 8px 0; color: #fff;">Немає документів</h3>
+					<p style="margin: 0; font-size: 0.95em;">Документи з'являться після завершення аукціонів</p>
+				</div>
+			`;
+			return; 
+		}
+		
+		const container = el('div', { style: 'overflow-x: auto;' });
+		const table = el('table', { style: 'width: 100%; border-collapse: collapse; background: rgba(20,20,30,0.5); border-radius: 8px; overflow: hidden;' });
+		table.innerHTML = `
+			<thead>
+				<tr style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); color: white;">
+					<th style="padding: 12px; text-align: left; font-weight: 600;">Аукціон</th>
+					<th style="padding: 12px; text-align: left; font-weight: 600;">Назва файлу</th>
+					<th style="padding: 12px; text-align: left; font-weight: 600;">Дії</th>
+				</tr>
+			</thead>
+		`;
+		
+		const tbody = el('tbody');
+		rows.forEach((d, idx) => {
+			const bgColor = idx % 2 === 0 ? 'rgba(40,40,50,0.3)' : 'rgba(30,30,40,0.3)';
+			const row = el('tr', { style: `background: ${bgColor};` });
+			row.innerHTML = `
+				<td style="padding: 12px;"><a href="auction.html?id=${d.auction_id}" style="color: #10b981; text-decoration: none;">#${d.auction_id}</a></td>
+				<td style="padding: 12px; color: #fff;">${d.filename}</td>
+			`;
+			
+			const actionCell = el('td', { style: 'padding: 12px;' });
+			const btn = el('button', { 
+				style: 'display: inline-block; padding: 6px 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 6px; font-size: 0.85rem; cursor: pointer;' 
+			}, '⬇️ Завантажити');
 			btn.addEventListener('click', async () => {
-				const res = await authorizedFetch(`/api/me/documents/${d.auction_id}/${encodeURIComponent(d.filename)}`);
-				if (!res.ok) { showToast('Не вдалося завантажити', 'error'); return; }
-				const blob = await res.blob();
-				const url = URL.createObjectURL(blob);
-				const a = document.createElement('a');
-				a.href = url; a.download = d.filename;
-				document.body.appendChild(a);
-				a.click();
-				a.remove();
-				URL.revokeObjectURL(url);
+				try {
+					const res = await authorizedFetch(`/api/me/documents/${d.auction_id}/${encodeURIComponent(d.filename)}`);
+					if (!res.ok) { showToast('Не вдалося завантажити', 'error'); return; }
+					const blob = await res.blob();
+					const url = URL.createObjectURL(blob);
+					const a = document.createElement('a');
+					a.href = url; a.download = d.filename;
+					document.body.appendChild(a);
+					a.click();
+					a.remove();
+					URL.revokeObjectURL(url);
+				} catch (e) {
+					showToast('Помилка завантаження', 'error');
+				}
 			});
-			item.appendChild(btn);
-			list.appendChild(item);
+			actionCell.appendChild(btn);
+			row.appendChild(actionCell);
+			tbody.appendChild(row);
 		});
-	} catch (_) {
-		list.textContent = 'Не вдалося завантажити';
+		
+		table.appendChild(tbody);
+		container.appendChild(table);
+		root.innerHTML = '';
+		root.appendChild(container);
+	} catch (err) {
+		console.error('Помилка завантаження документів:', err);
+		root.innerHTML = '<div style="color: #ff8888; padding: 16px; background: rgba(255,136,136,0.1); border-radius: 8px;">❌ Не вдалося завантажити документи</div>';
 	}
 }
 
 async function renderHoldings(root) {
 	if (!root) return;
-	root.innerHTML = '';
-	const list = el('div', { className: 'data-list' });
-	list.textContent = 'Завантаження інвентарю…';
-	root.appendChild(list);
+	root.innerHTML = '<div style="padding: 16px; text-align: center; color: rgba(255,255,255,0.7);">⏳ Завантаження інвентарю...</div>';
+	
 	try {
 		const rows = await meInventory();
-		if (!rows.length) { list.textContent = 'Інвентар поки порожній'; return; }
-		list.innerHTML = '';
+		if (!rows || !rows.length) { 
+			root.innerHTML = `
+				<div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.6);">
+					<div style="font-size: 48px; margin-bottom: 16px;">📦</div>
+					<h3 style="margin: 0 0 8px 0; color: #fff;">Інвентар порожній</h3>
+					<p style="margin: 0; font-size: 0.95em;">Після клірингу ваші ресурси з'являться тут</p>
+				</div>
+			`;
+			return; 
+		}
+		
+		let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;">';
+		
 		rows.forEach((entry) => {
 			const rawQty = typeof entry.quantity === 'number' ? entry.quantity : Number(entry.quantity);
 			const qtyText = Number.isFinite(rawQty)
@@ -342,95 +472,171 @@ async function renderHoldings(root) {
 				: String(entry.quantity);
 			const updatedLabel = entry.updated_at || entry.updatedAt;
 			const updatedText = updatedLabel ? new Date(updatedLabel).toLocaleString() : '';
-			list.appendChild(el('div', { className: 'data-list__item' },
-				el('span', { className: 'data-list__label' }, entry.product || 'Невідомий товар'),
-				el('span', { className: 'chip' }, qtyText),
-				updatedText ? el('span', { className: 'data-list__meta' }, updatedText) : null
-			));
+			
+			html += `
+				<div style="
+					background: rgba(255,255,255,0.05);
+					border: 1px solid rgba(255,255,255,0.1);
+					border-radius: 12px;
+					padding: 1.5rem;
+					transition: all 0.3s ease;
+				" onmouseover="this.style.borderColor='#10b981'; this.style.transform='translateY(-4px)'; this.style.boxShadow='0 8px 24px rgba(16, 185, 129, 0.3)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)'; this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+					<div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1);">
+						<div style="font-size: 2rem;">📦</div>
+						<div style="font-size: 1.2rem; font-weight: 700; color: #fff;">${entry.product || 'Невідомий товар'}</div>
+					</div>
+					<div style="display: flex; flex-direction: column; gap: 0.75rem;">
+						<div style="display: flex; justify-content: space-between; align-items: center;">
+							<span style="font-size: 0.9rem; color: rgba(255,255,255,0.7);">Кількість:</span>
+							<span style="font-weight: 600; color: #10b981;">${qtyText} шт</span>
+						</div>
+						<div style="display: flex; justify-content: space-between; align-items: center;">
+							<span style="font-size: 0.9rem; color: rgba(255,255,255,0.7);">Оновлено:</span>
+							<span style="font-weight: 500; color: #fff;">${updatedText}</span>
+						</div>
+					</div>
+				</div>
+			`;
 		});
-	} catch (_) {
-		list.textContent = 'Не вдалося завантажити інвентар';
+		
+		html += '</div>';
+		root.innerHTML = html;
+	} catch (err) {
+		console.error('Помилка завантаження інвентарю:', err);
+		root.innerHTML = '<div style="color: #ff8888; padding: 16px; background: rgba(255,136,136,0.1); border-radius: 8px;">❌ Не вдалося завантажити інвентар</div>';
 	}
 }
 
 async function renderClearingInsights(root) {
 	if (!root) return;
-	root.innerHTML = '';
-	const wrap = el('div', { className: 'stack-grid' });
-	wrap.textContent = 'Завантаження даних клірингу…';
-	root.appendChild(wrap);
+	root.innerHTML = '<div style="padding: 16px; text-align: center; color: rgba(255,255,255,0.7);">⏳ Завантаження даних клірингу...</div>';
+	
 	try {
 		const data = await meClearingInsights();
 		const { summary, lastRound, recentFills, inventoryEvents } = data || {};
-		wrap.innerHTML = '';
+		
+		if (!summary && !lastRound && (!recentFills || !recentFills.length)) {
+			root.innerHTML = `
+				<div style="text-align: center; padding: 40px; color: rgba(255,255,255,0.6);">
+					<div style="font-size: 48px; margin-bottom: 16px;">📊</div>
+					<h3 style="margin: 0 0 8px 0; color: #fff;">Немає даних клірингу</h3>
+					<p style="margin: 0; font-size: 0.95em;">Дані з\'являться після виконання ваших ордерів</p>
+				</div>
+			`;
+			return;
+		}
 
-		const summaryCard = el('article', { className: 'stack-card' },
-			el('div', { className: 'stack-card__header' },
-				el('strong', {}, 'Після клірингу'),
-				el('span', { className: 'chip' }, `${summary?.positions || 0} позицій`),
-				el('span', { className: 'chip' }, `Σ ${Number(summary?.totalQuantity || 0).toLocaleString('uk-UA', { maximumFractionDigits: 6 })}`)
-			),
-			el('div', { className: 'stack-card__meta' }, summary?.lastClearingAt
-				? `Останній кліринг • ${new Date(summary.lastClearingAt).toLocaleString()}`
-				: 'Очікуємо перший кліринг')
-		);
-		wrap.appendChild(summaryCard);
-
-		const lastRoundCard = el('article', { className: 'stack-card' });
-		const lrHeader = el('div', { className: 'stack-card__header' },
-			el('strong', {}, 'Останній раунд'),
-			lastRound ? el('span', { className: 'chip' }, `Аукціон #${lastRound.auction_id}`) : null,
-			lastRound ? el('span', { className: 'chip' }, `Раунд ${lastRound.round_number}`) : null
-		);
-		lastRoundCard.appendChild(lrHeader);
+		let html = '<div style="display: flex; flex-direction: column; gap: 1.5rem;">';
+		
+		// Зведення
+		if (summary) {
+			html += `
+				<div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 1.5rem;">
+					<h3 style="margin: 0 0 1rem 0; color: #fff; font-size: 1.2rem;">📊 Зведення</h3>
+					<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+						<div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); padding: 1rem; border-radius: 8px; text-align: center;">
+							<div style="color: rgba(255,255,255,0.7); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 0.5rem;">Позицій</div>
+							<div style="color: #10b981; font-size: 1.5rem; font-weight: 700;">${summary.positions || 0}</div>
+						</div>
+						<div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); padding: 1rem; border-radius: 8px; text-align: center;">
+							<div style="color: rgba(255,255,255,0.7); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 0.5rem;">Кількість</div>
+							<div style="color: #10b981; font-size: 1.5rem; font-weight: 700;">${Number(summary.totalQuantity || 0).toFixed(2)}</div>
+						</div>
+						<div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); padding: 1rem; border-radius: 8px; text-align: center;">
+							<div style="color: rgba(255,255,255,0.7); font-size: 0.8rem; text-transform: uppercase; margin-bottom: 0.5rem;">Останній кліринг</div>
+							<div style="color: #10b981; font-size: 0.9rem; font-weight: 500;">${summary.lastClearingAt ? new Date(summary.lastClearingAt).toLocaleString() : 'Немає'}</div>
+						</div>
+					</div>
+				</div>
+			`;
+		}
+		
+		// Останній раунд
 		if (lastRound) {
-			lastRoundCard.append(
-				el('div', { className: 'stack-card__meta' }, `${lastRound.product} • ${lastRound.type || 'auction'}`),
-				el('div', { className: 'stack-card__meta' }, `Ціна ${lastRound.clearing_price ?? '—'} × Обсяг ${lastRound.clearing_volume ?? '—'}`),
-				el('div', { className: 'stack-card__meta' }, `Попит ${lastRound.clearing_demand ?? '—'} • Пропозиція ${lastRound.clearing_supply ?? '—'}`),
-				el('div', { className: 'stack-card__meta' }, new Date(lastRound.cleared_at).toLocaleString())
-			);
-		} else {
-			lastRoundCard.appendChild(el('div', { className: 'stack-card__meta' }, 'Ще немає виконаних раундів'));
+			html += `
+				<div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 1.5rem;">
+					<h3 style="margin: 0 0 1rem 0; color: #fff; font-size: 1.2rem;">🎯 Останній раунд клірингу</h3>
+					<div style="display: flex; flex-direction: column; gap: 0.5rem;">
+						<div style="display: flex; justify-content: space-between; padding: 0.5rem; background: rgba(255,255,255,0.03); border-radius: 4px;">
+							<span style="color: rgba(255,255,255,0.7);">Аукціон:</span>
+							<a href="auction.html?id=${lastRound.auction_id}" style="color: #10b981; text-decoration: none;">#${lastRound.auction_id} - ${lastRound.product || ''}</a>
+						</div>
+						<div style="display: flex; justify-content: space-between; padding: 0.5rem; background: rgba(255,255,255,0.03); border-radius: 4px;">
+							<span style="color: rgba(255,255,255,0.7);">Раунд:</span>
+							<span style="color: #fff;">#${lastRound.round_number}</span>
+						</div>
+						<div style="display: flex; justify-content: space-between; padding: 0.5rem; background: rgba(255,255,255,0.03); border-radius: 4px;">
+							<span style="color: rgba(255,255,255,0.7);">Ціна:</span>
+							<span style="color: #fff;">${lastRound.clearing_price ?? '—'} грн</span>
+						</div>
+						<div style="display: flex; justify-content: space-between; padding: 0.5rem; background: rgba(255,255,255,0.03); border-radius: 4px;">
+							<span style="color: rgba(255,255,255,0.7);">Обсяг:</span>
+							<span style="color: #fff;">${lastRound.clearing_volume ?? '—'} шт</span>
+						</div>
+					</div>
+				</div>
+			`;
 		}
-		wrap.appendChild(lastRoundCard);
-
-		const fillsCard = el('article', { className: 'stack-card' });
-		fillsCard.appendChild(el('div', { className: 'stack-card__header' },
-			el('strong', {}, 'Останні виконані ордери'),
-			el('span', { className: 'pill pill--outline' }, `${(recentFills || []).length}`)
-		));
+		
+		// Виконані ордери
 		if (recentFills && recentFills.length) {
-			recentFills.forEach((f) => {
-				const qty = Number(f.cleared_quantity || f.quantity || 0);
-				const price = f.cleared_price ?? f.price;
-				fillsCard.appendChild(el('div', { className: 'stack-card__meta' },
-					`#${f.auction_id} • ${f.side} • ${price} × ${qty} • ${new Date(f.cleared_at).toLocaleString()}`
-				));
-			});
-		} else {
-			fillsCard.appendChild(el('div', { className: 'stack-card__meta' }, 'Виконані ордери ще не з’явилися'));
+			let fillsRows = recentFills.map((f, i) => {
+				const bg = i % 2 === 0 ? 'rgba(40,40,50,0.3)' : 'rgba(30,30,40,0.3)';
+				const sideColor = f.side === 'buy' ? '#4ade80' : '#f87171';
+				const sideText = f.side === 'buy' ? '🟢 Купити' : '🔴 Продати';
+				return `<tr style="background: ${bg};">
+					<td style="padding: 10px; color: #fff;"><a href="auction.html?id=${f.auction_id}" style="color: #10b981;">#${f.auction_id}</a></td>
+					<td style="padding: 10px; color: ${sideColor};">${sideText}</td>
+					<td style="padding: 10px; color: #fff;">${f.cleared_price ?? f.price ?? '—'} грн</td>
+					<td style="padding: 10px; color: #fff;">${f.cleared_quantity ?? f.quantity ?? '—'} шт</td>
+				</tr>`;
+			}).join('');
+			
+			html += `
+				<div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 1.5rem;">
+					<h3 style="margin: 0 0 1rem 0; color: #fff; font-size: 1.2rem;">✅ Останні виконані ордери (${recentFills.length})</h3>
+					<div style="overflow-x: auto;">
+						<table style="width: 100%; border-collapse: collapse;">
+							<thead>
+								<tr style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);">
+									<th style="padding: 10px; text-align: left; color: white; font-weight: 600;">Аукціон</th>
+									<th style="padding: 10px; text-align: left; color: white; font-weight: 600;">Сторона</th>
+									<th style="padding: 10px; text-align: left; color: white; font-weight: 600;">Ціна</th>
+									<th style="padding: 10px; text-align: left; color: white; font-weight: 600;">Кількість</th>
+								</tr>
+							</thead>
+							<tbody>${fillsRows}</tbody>
+						</table>
+					</div>
+				</div>
+			`;
 		}
-		wrap.appendChild(fillsCard);
-
-		const invCard = el('article', { className: 'stack-card' });
-		invCard.appendChild(el('div', { className: 'stack-card__header' },
-			el('strong', {}, 'Інвентарні події'),
-			el('span', { className: 'pill pill--outline' }, `${(inventoryEvents || []).length}`)
-		));
+		
+		// Події інвентарю
 		if (inventoryEvents && inventoryEvents.length) {
-			inventoryEvents.forEach((ev) => {
-				const qty = Number(ev.quantity || 0).toLocaleString('uk-UA', { maximumFractionDigits: 6 });
-				invCard.appendChild(el('div', { className: 'stack-card__meta' },
-					`${ev.type} • ${qty} • ${new Date(ev.occurred_at).toLocaleString()}${ev.notes ? ` • ${ev.notes}` : ''}`
-				));
-			});
-		} else {
-			invCard.appendChild(el('div', { className: 'stack-card__meta' }, 'Ще немає подій інвентарю'));
+			const typeIcons = { 'clearing': '⚖️', 'deposit': '➕', 'withdrawal': '➖', 'adjustment': '🔧' };
+			let eventsHtml = inventoryEvents.map(ev => {
+				const icon = typeIcons[ev.type] || '📋';
+				return `<div style="display: flex; justify-content: space-between; padding: 0.5rem; background: rgba(255,255,255,0.03); border-radius: 4px; flex-wrap: wrap; gap: 0.5rem;">
+					<span style="color: #fff;">${icon} ${ev.type}</span>
+					<span style="color: rgba(255,255,255,0.7);">${ev.quantity} шт</span>
+					<span style="color: rgba(255,255,255,0.5); font-size: 0.85rem;">${new Date(ev.occurred_at).toLocaleString()}</span>
+				</div>`;
+			}).join('');
+			
+			html += `
+				<div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 1.5rem;">
+					<h3 style="margin: 0 0 1rem 0; color: #fff; font-size: 1.2rem;">📝 Події інвентарю (${inventoryEvents.length})</h3>
+					<div style="display: flex; flex-direction: column; gap: 0.5rem;">${eventsHtml}</div>
+				</div>
+			`;
 		}
-		wrap.appendChild(invCard);
-	} catch (_) {
-		wrap.textContent = 'Не вдалося отримати дані клірингу';
+		
+		html += '</div>';
+		root.innerHTML = html;
+	} catch (err) {
+		console.error('Помилка завантаження клірингу:', err);
+		root.innerHTML = '<div style="color: #ff8888; padding: 16px; background: rgba(255,136,136,0.1); border-radius: 8px;">❌ Не вдалося отримати дані клірингу</div>';
 	}
 }
 
@@ -503,8 +709,19 @@ async function renderDashboard(container, session) {
 		el('h2', { className: 'section-heading__title' }, 'Ваша історія торгів'),
 		el('p', { className: 'section-heading__meta' }, 'Перемикайтеся між аукціонами, ордерами та документами.')
 	));
-	const activityTabs = el('div', { className: 'tabs dashboard-tabs' });
-	const activityContent = el('div', { className: 'tab-panel' });
+	
+	// Кнопка створення аукціону
+	const createAuctionBtn = el('div', { style: 'margin-bottom: 20px;' });
+	const btnLink = el('a', { 
+		href: 'create-auction.html', 
+		className: 'btn btn-primary',
+		style: 'display: inline-block; padding: 12px 24px; text-decoration: none;'
+	}, '+ Створити новий аукціон');
+	createAuctionBtn.appendChild(btnLink);
+	activitySection.appendChild(createAuctionBtn);
+	
+	const activityTabs = el('div', { className: 'tabs dashboard-tabs', style: 'display: flex; gap: 8px; margin-bottom: 16px;' });
+	const activityContent = el('div', { className: 'tab-panel', style: 'display: block; min-height: 100px; padding: 16px; background: rgba(30,30,40,0.5); border-radius: 8px;' });
 	activitySection.append(activityTabs, activityContent);
 	shell.appendChild(activitySection);
 
@@ -518,18 +735,21 @@ async function renderDashboard(container, session) {
 	const activityTabEls = new Map();
 
 	function setActivityActive(key) {
+		console.log('[setActivityActive] key:', key, 'activityContent:', activityContent);
 		activeActivity = key;
 		for (const [k, elTab] of activityTabEls.entries()) {
 			elTab.classList.toggle('tab--active', k === key);
 		}
-		activityContent.innerHTML = '';
+		activityContent.innerHTML = '<div style="padding: 16px; color: #fff;">⏳ Завантаження...</div>';
 		const section = activitySections.find(s => s.key === key);
+		console.log('[setActivityActive] section:', section);
 		if (section) {
 			const maybePromise = section.render(activityContent);
+			console.log('[setActivityActive] maybePromise:', maybePromise);
 			if (maybePromise && typeof maybePromise.then === 'function') {
 				maybePromise.catch(err => {
 					console.error(`Не вдалося відтворити розділ ${key}`, err);
-					activityContent.textContent = 'Не вдалося завантажити розділ.';
+					activityContent.innerHTML = '<div style="color: #ff8888; padding: 16px;">❌ Не вдалося завантажити розділ.</div>';
 				});
 			}
 		}

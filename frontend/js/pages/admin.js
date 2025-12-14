@@ -334,7 +334,7 @@ async function loadClearingHistory(auctionId, host) {
     }
     wrap.innerHTML = "";
     const table = el("table", { style: "width:100%;font-size:0.68rem;border-collapse:collapse;" });
-    const thead = el("thead", {}, el("tr", {}, ["Раунд","Ціна","Обсяг","Попит","Пропозиція","Bid","Ask","Виконано","Час"].map(h => el("th", { style: "padding:4px;border-bottom:1px solid var(--surface-border-soft);text-align:left;" }, h))));
+    const thead = el("thead", {}, el("tr", {}, ...["Раунд","Ціна","Обсяг","Попит","Пропозиція","Bid","Ask","Виконано","Час"].map(h => el("th", { style: "padding:4px;border-bottom:1px solid var(--surface-border-soft);text-align:left;" }, h))));
     const tbody = el("tbody");
     rounds.forEach(r => {
       const tr = el("tr", {});
@@ -760,7 +760,7 @@ async function render() {
         return;
       }
       const table = el("table", { className: "admin-pending-table", style: "width:100%;font-size:0.68rem;border-collapse:collapse;" });
-      const thead = el("thead", {}, el("tr", {}, ["☑","#","Aукціон","Продукт","Трейдер","Side","Ціна","К-сть","k деф","Створено","Дії"].map(h => el("th", { style: "position:sticky;top:0;background:var(--surface);padding:4px;border-bottom:1px solid var(--surface-border-soft);" }, h))));
+      const thead = el("thead", {}, el("tr", {}, ...["☑","#","Aукціон","Продукт","Трейдер","Side","Ціна","К-сть","k деф","Створено","Дії"].map(h => el("th", { style: "position:sticky;top:0;background:var(--surface);padding:4px;border-bottom:1px solid var(--surface-border-soft);" }, h))));
       const tbody = el("tbody");
       S.pendingOrders.forEach(o => {
         const tr = el("tr", {});

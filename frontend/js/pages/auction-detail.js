@@ -902,10 +902,16 @@ async function renderMyOrdersTab(me) {
     const li = document.createElement('li');
     const qty = Number(o.quantity);
     const createdAt = o.created_at ? new Date(o.created_at).toLocaleString() : '';
-    li.innerHTML = `
-      <div><strong>${tSide(o.side)}</strong> ${formatQty(qty)} @ ${formatPrice(o.price)} ${o.status ? `<span class="pill">${o.status}</span>` : ''}</div>
-      <span>${createdAt}</span>
-    `;
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.innerHTML = `<strong>${tSide(o.side)}</strong> ${formatQty(qty)} @ ${formatPrice(o.price)} ${o.status ? `<span class="pill">${o.status}</span>` : ''}`;
+    
+    const timeSpan = document.createElement('span');
+    timeSpan.textContent = createdAt;
+    
+    li.appendChild(contentDiv);
+    li.appendChild(timeSpan);
+    
     if (o.status === 'open') {
       const btn = document.createElement('button');
       btn.className = 'btn btn-ghost btn-compact';
