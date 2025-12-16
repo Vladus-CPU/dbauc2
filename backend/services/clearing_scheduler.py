@@ -260,6 +260,19 @@ def _execute_clearing_for_auction(conn, auction: Dict, current_time: datetime):
         orders = cursor.fetchall()
         
         print(f"[CLEARING] Знайдено {len(orders)} затверджених заявок")
+
+        # Якщо немає перетину цінами (best bid < best ask), легке підштовхування для ботів
+        bids_prices = [to_decimal(o['price']) for o in orders if o['side'] == 'bid']
+        asks_prices = [to_decimal(o['price']) for o in orders if o['side'] == 'ask']
+        if bids_prices and asks_prices:
+            best_bid = max(bids_prices)
+            best_ask = min(asks_prices)
+            if best_bid < best_ask:
+                # Опускаємо найнижчий ask до ціни best bid, щоб мати хоча б мінімальний перетин
+                lowest_ask_idx = next((idx for idx, o in enumerate(orders) if o['side'] == 'ask' and to_decimal(o['price']) == best_ask), None)
+                if lowest_ask_idx is not None:
+                    print(f"[CLEARING] Немає перетину: best_bid={best_bid}, best_ask={best_ask}. Опускаємо ask до {best_bid}.")
+                    orders[lowest_ask_idx]['price'] = best_bid
         
         # Якщо немає заявок для клірингу, плануємо наступний раунд
         if not orders:
@@ -483,7 +496,10 @@ def _execute_clearing_for_auction(conn, auction: Dict, current_time: datetime):
         # Зберігаємо повний стан інвентарю всіх учасників після клірингу
         _create_inventory_snapshot(conn, auction_id, new_round)
         
-        # КРОК 8: ПЛАНУВАННЯ НАСТУПНОГО РАУНДУ
+        # КРОК 8: ПРИБИРАЄМО ВІДКРИТІ БОТ-ОРДЕРИ (щоб не висіли після клірингу)
+        _cleanup_bot_orders(conn, auction_id)
+
+        # КРОК 9: ПЛАНУВАННЯ НАСТУПНОГО РАУНДУ
         # Встановлюємо час наступного клірингу (через 5 хвилин)
         _schedule_next_clearing(cursor, auction_id, new_round, current_time)
         
@@ -661,6 +677,56 @@ def _create_inventory_snapshot(conn, auction_id: int, round_number: int):
         
     finally:
         cursor.close()
+
+
+def _cleanup_bot_orders(conn, auction_id: int):
+    """Позбавляємося від відкритих бот-ордерів після клірингу, щоб вони не висіли в книзі."""
+    cur = conn.cursor(dictionary=True)
+    try:
+        cur.execute(
+            """
+            SELECT ao.id, ao.side, ao.reserved_amount, ao.trader_id
+            FROM auction_orders ao
+            JOIN users u ON u.id = ao.trader_id
+            WHERE ao.auction_id=%s AND ao.status='open' AND u.username LIKE 'bot_%%'
+            """,
+            (auction_id,)
+        )
+        rows = cur.fetchall()
+    finally:
+        cur.close()
+
+    if not rows:
+        return
+
+    print(f"[CLEARING] Прибираємо {len(rows)} відкритих бот-ордерів після клірингу")
+    upd_cur = conn.cursor()
+    try:
+        for row in rows:
+            order_id = row['id']
+            side = row['side']
+            trader_id = row['trader_id']
+            reserved = row.get('reserved_amount')
+            # Якщо це bid з резервом — повертаємо зарезервовані кошти
+            if side == 'bid' and reserved is not None:
+                try:
+                    amt = to_decimal(reserved)
+                except Exception:
+                    amt = Decimal('0')
+                if amt > 0:
+                    wallet_release(conn=conn, user_id=trader_id, amount=amt, meta={
+                        "type": "bot_cleanup_release",
+                        "auction_id": auction_id,
+                        "order_id": order_id
+                    })
+            # Закриваємо ордер і зануляємо кількість
+            upd_cur.execute(
+                "UPDATE auction_orders SET status='cleared', quantity=0, cleared_quantity=COALESCE(cleared_quantity,0) WHERE id=%s",
+                (order_id,)
+            )
+        conn.commit()
+    finally:
+        upd_cur.close()
 
 
 def _close_auction_automatically(conn, auction_id: int, current_time: datetime):

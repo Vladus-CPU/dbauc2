@@ -1,5 +1,34 @@
 from flask import Blueprint, jsonify, request
-from passlib.hash import bcrypt
+from passlib.hash import pbkdf2_sha256
+try:
+    from passlib.hash import bcrypt as bcrypt_hash
+except Exception:
+    bcrypt_hash = None
+def _hash_password(password: str) -> str:
+    """Hash password using pbkdf2_sha256 (pure Python, no native deps)."""
+    return pbkdf2_sha256.hash(password)
+
+
+def _verify_password(password: str, stored_hash: str) -> bool:
+    """Verify password; support pbkdf2 first, fallback to bcrypt if present."""
+    # Primary: pbkdf2
+    try:
+        if stored_hash.startswith("$pbkdf2-sha256$") and pbkdf2_sha256.verify(password, stored_hash):
+            return True
+    except Exception:
+        pass
+    # Fallback: bcrypt hashes created раніше, якщо модуль доступний
+    if bcrypt_hash and stored_hash.startswith("$2"):
+        try:
+            return bcrypt_hash.verify(password, stored_hash)
+        except Exception:
+            pass
+    # Generic attempt pbkdf2 (covers hashes без prefix, якщо такі є)
+    try:
+        return pbkdf2_sha256.verify(password, stored_hash)
+    except Exception:
+        return False
+
 from ..db import db_connection, ensure_users_table, ensure_user_profiles
 from ..errors import AppError, DBError
 from ..security import create_token, get_auth_user
@@ -28,7 +57,7 @@ def register():
         cur.execute("SELECT id FROM users WHERE username=%s", (username,))
         if cur.fetchone():
             return jsonify({"error": "Username already exists"}), 409
-        pwd_hash = bcrypt.hash(password)
+        pwd_hash = _hash_password(password)
         cur.execute(
             "INSERT INTO users (username, email, password_hash, is_admin) VALUES (%s, %s, %s, %s)",
             (username, email, pwd_hash, 0)
@@ -61,7 +90,7 @@ def login():
     try:
         cur.execute("SELECT id, username, email, password_hash, is_admin, created_at FROM users WHERE username=%s", (username,))
         user = cur.fetchone()
-        if not user or not bcrypt.verify(password, user['password_hash']):
+        if not user or not _verify_password(password, user['password_hash']):
             return jsonify({"error": "Invalid credentials"}), 401
         token = create_token(user)
         return jsonify({

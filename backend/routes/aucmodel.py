@@ -238,32 +238,7 @@ def auction_order_book(auction_id: int):
         recent_bid_orders = sorted(bid_orders, key=lambda o: (o['price'], o['created_at']), reverse=True)[:10]
         recent_ask_orders = sorted(ask_orders, key=lambda o: (o['price'], o['created_at']))[:10]
         
-        # Ensure next_clearing_at is set - if NULL or in past, set to 5 minutes from now
-        now = datetime.datetime.utcnow()
-        next_clear_at = auction.get('next_clearing_at')
-        
-        # Check if we need to update next_clearing_at in DB
-        # Both should be naive UTC datetimes, so direct comparison works
-        should_update = next_clear_at is None or next_clear_at < now
-        
-        if should_update:
-            future_time = now + datetime.timedelta(minutes=5)
-            auction['next_clearing_at'] = future_time
-            print(f"[AUCTION {auction_id}] Updating next_clearing_at from {next_clear_at} to {future_time}")
-            # Update database - use a fresh cursor for this operation
-            try:
-                update_cur = conn.cursor()
-                update_cur.execute(
-                    "UPDATE auctions SET next_clearing_at=%s WHERE id=%s",
-                    (future_time, auction_id)
-                )
-                rows_updated = update_cur.rowcount
-                conn.commit()
-                update_cur.close()
-                print(f"[AUCTION {auction_id}] Updated {rows_updated} rows in DB")
-            except Exception as e:
-                conn.rollback()
-                print(f"ERROR: Failed to update next_clearing_at in DB for auction {auction_id}: {e}")
+        # Do NOT mutate next_clearing_at here: scheduler керує часом клірингу
         
         response = {
             "auction": serialize(auction),
@@ -1119,7 +1094,8 @@ def seed_random_orders(auction_id: int):
     bids_per = int(data.get('bidsPerTrader') or 1)
     asks_per = int(data.get('asksPerTrader') or 1)
     price_spread_pct = float(data.get('priceSpread') or 5.0)
-    allow_cross = bool(data.get('allowCross'))
+    # За замовчуванням дозволяємо перехресний спред, щоб боти точно давали обсяг
+    allow_cross = True if data.get('allowCross') is None else bool(data.get('allowCross'))
     qty_min = float(data.get('quantityMin') or 1.0)
     qty_max = float(data.get('quantityMax') or 10.0)
     if count < 1 or count > 200:
@@ -1132,6 +1108,7 @@ def seed_random_orders(auction_id: int):
         ensure_users_table(conn)
         ensure_user_profiles(conn)
         ensure_auctions_tables(conn)
+        ensure_wallet_tables(conn)
         cur.execute("SELECT id, status, type FROM auctions WHERE id=%s", (auction_id,))
         auction = cur.fetchone()
         if not auction:
@@ -1167,15 +1144,19 @@ def seed_random_orders(auction_id: int):
             next_iteration = int(iter_row.get('max_iter') or 0) + 1
         except (TypeError, ValueError):
             next_iteration = 1
-        from passlib.hash import bcrypt
+        from passlib.hash import pbkdf2_sha256
+        # Розрахунок безпечного депозиту для ботів, щоб вистачило на всі резерви
+        max_bid_reserve = Decimal(str(price_center)) * Decimal(str(qty_max)) * Decimal(max(1, bids_per))
+        deposit_amount = max(Decimal('10000'), max_bid_reserve * Decimal('2'))
         for i in range(count):
             username = f"bot_{int(time.time())}_{os.urandom(3).hex()}_{i}"[:60]
-            pwd_hash = bcrypt.hash('password')
+            pwd_hash = pbkdf2_sha256.hash('password')
             cur.execute(
                 "INSERT INTO users (username, password_hash, is_admin) VALUES (%s,%s,%s)",
                 (username, pwd_hash, 0)
             )
             user_id = cur.lastrowid
+            wallet_deposit(conn, user_id, deposit_amount, meta={"action": "seed_bot_wallet", "auctionId": auction_id})
             cur.execute(
                 "INSERT INTO traders_profile (user_id, first_name, last_name) VALUES (%s,%s,%s) ON DUPLICATE KEY UPDATE first_name=VALUES(first_name), last_name=VALUES(last_name)",
                 (user_id, 'Bot', 'Trader')
@@ -1189,9 +1170,17 @@ def seed_random_orders(auction_id: int):
                 price_delta = price_center * (random.uniform(-price_spread_pct, 0) / 100.0)
                 price = max(0.000001, price_center + price_delta)
                 qty = random.uniform(qty_min, qty_max)
+                reserve_amount = (Decimal(str(price)) * Decimal(str(qty))).quantize(DECIMAL_QUANT)
+                reserve_result = wallet_reserve(conn, user_id, reserve_amount, meta={
+                    "auctionId": auction_id,
+                    "orderSide": "bid",
+                    "price": str(price),
+                    "quantity": str(qty)
+                })
+                reserve_tx_id = reserve_result['txId']
                 cur.execute(
-                    "INSERT INTO auction_orders (auction_id, trader_id, side, price, quantity, iteration) VALUES (%s,%s,'bid',%s,%s,%s)",
-                    (auction_id, user_id, price, qty, next_iteration)
+                    "INSERT INTO auction_orders (auction_id, trader_id, side, price, quantity, iteration, reserved_amount, reserve_tx_id) VALUES (%s,%s,'bid',%s,%s,%s,%s,%s)",
+                    (auction_id, user_id, price, qty, next_iteration, str(reserve_amount), reserve_tx_id)
                 )
                 order_rows.append({"side": "bid", "price": price, "quantity": qty})
                 next_iteration += 1
@@ -1205,15 +1194,42 @@ def seed_random_orders(auction_id: int):
                 )
                 order_rows.append({"side": "ask", "price": price, "quantity": qty})
                 next_iteration += 1
-        if not allow_cross:
-            cur.execute("SELECT MAX(price) bb FROM auction_orders WHERE auction_id=%s AND side='bid' AND status='open'", (auction_id,))
-            bb = cur.fetchone()['bb']
-            cur.execute("SELECT MIN(price) ba FROM auction_orders WHERE auction_id=%s AND side='ask' AND status='open'", (auction_id,))
-            ba = cur.fetchone()['ba']
+        # Якщо дозволено перехресний ринок, але перетину немає, примусово опускаємо найнижчий ask до рівня best bid
+        cur.execute("SELECT MAX(price) bb FROM auction_orders WHERE auction_id=%s AND side='bid' AND status='open'", (auction_id,))
+        bb = cur.fetchone()['bb']
+        cur.execute("SELECT MIN(price) ba FROM auction_orders WHERE auction_id=%s AND side='ask' AND status='open'", (auction_id,))
+        ba = cur.fetchone()['ba']
+        if bb is not None and ba is not None:
             try:
-                if bb is not None and ba is not None and float(bb) >= float(ba):
-                    widen = (float(bb) - float(ba)) + (float(price_center) * 0.0001)
-                    cur.execute("UPDATE auction_orders SET price=price + %s WHERE auction_id=%s AND side='ask' AND status='open'", (widen, auction_id))
+                bb_f = float(bb)
+                ba_f = float(ba)
+                if not allow_cross:
+                    # старий режим: розширюємо спред, щоб не було перетину
+                    if bb_f >= ba_f:
+                        widen = (bb_f - ba_f) + (float(price_center) * 0.0001)
+                        cur.execute(
+                            "UPDATE auction_orders SET price=price + %s WHERE auction_id=%s AND side='ask' AND status='open'",
+                            (widen, auction_id)
+                        )
+                else:
+                    # новий режим: гарантуємо перетин, якщо його немає
+                    if bb_f < ba_f:
+                        # опускаємо один найнижчий ask до best bid
+                        cur.execute(
+                            """
+                            UPDATE auction_orders
+                            SET price=%s
+                            WHERE id = (
+                                SELECT id FROM (
+                                    SELECT id FROM auction_orders
+                                    WHERE auction_id=%s AND side='ask' AND status='open'
+                                    ORDER BY price ASC, created_at ASC
+                                    LIMIT 1
+                                ) AS t
+                            )
+                            """,
+                            (bb_f, auction_id)
+                        )
             except Exception:
                 pass
         conn.commit()
