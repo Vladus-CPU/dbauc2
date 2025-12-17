@@ -681,9 +681,9 @@ def _create_inventory_snapshot(conn, auction_id: int, round_number: int):
 
 def _cleanup_bot_orders(conn, auction_id: int):
     """Позбавляємося від відкритих бот-ордерів після клірингу, щоб вони не висіли в книзі."""
-    cur = conn.cursor(dictionary=True)
+    cursor = conn.cursor(dictionary=True)
     try:
-        cur.execute(
+        cursor.execute(
             """
             SELECT ao.id, ao.side, ao.reserved_amount, ao.trader_id
             FROM auction_orders ao
@@ -692,16 +692,13 @@ def _cleanup_bot_orders(conn, auction_id: int):
             """,
             (auction_id,)
         )
-        rows = cur.fetchall()
-    finally:
-        cur.close()
+        rows = cursor.fetchall()
+        
+        if not rows:
+            return
 
-    if not rows:
-        return
-
-    print(f"[CLEARING] Прибираємо {len(rows)} відкритих бот-ордерів після клірингу")
-    upd_cur = conn.cursor()
-    try:
+        print(f"[CLEARING] Прибираємо {len(rows)} відкритих бот-ордерів після клірингу")
+        
         for row in rows:
             order_id = row['id']
             side = row['side']
@@ -720,13 +717,13 @@ def _cleanup_bot_orders(conn, auction_id: int):
                         "order_id": order_id
                     })
             # Закриваємо ордер і зануляємо кількість
-            upd_cur.execute(
+            cursor.execute(
                 "UPDATE auction_orders SET status='cleared', quantity=0, cleared_quantity=COALESCE(cleared_quantity,0) WHERE id=%s",
                 (order_id,)
             )
         conn.commit()
     finally:
-        upd_cur.close()
+        cursor.close()
 
 
 def _close_auction_automatically(conn, auction_id: int, current_time: datetime):
